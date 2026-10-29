@@ -138,12 +138,26 @@ fn run(a: Args) -> Result<bool, String> {
     if let Some(log) = &s.phrase_log {
         fs::write(a.out.join("phrases.tsv"), log).map_err(|e| e.to_string())?;
     }
+    let registers = {
+        use ferrogolem_core::cpu::{AX, BP, BX, CS, CX, DI, DS, DX, ES, SI, SP, SS};
+        let (r, g) = (&s.m.cpu.r, &s.m.cpu.s);
+        format!(
+            "AX={:04x} BX={:04x} CX={:04x} DX={:04x} SI={:04x} DI={:04x} BP={:04x} SP={:04x} DS={:04x} ES={:04x} SS={:04x} CS={:04x} IP={:04x}",
+            r[AX], r[BX], r[CX], r[DX], r[SI], r[DI], r[BP], r[SP], g[DS], g[ES], g[SS], g[CS], s.m.cpu.ip
+        )
+    };
     let report = json!({
         "executed": s.m.cpu.steps, "error": error, "at": format!("{:04x}:{:04x}", s.m.cpu.start.0, s.m.cpu.start.1),
         "cycles_per_ms": a.cycles, "virtual_ms": u128::from(s.m.cpu.steps) * 1000 / u128::from(s.m.ips.max(1)),
         "events": s.events, "translated": s.translated, "catalog": s.catalog.len(),
         "overlay_removed": s.screen.removed,
         "signature_mismatches": s.take.mismatches.iter().map(|(o, n)| format!("{o:04x}×{n}")).collect::<Vec<_>>(),
+        // 停點診斷：最近的讀檔、開檔、暫存器與音效狀態（與 fg-probe 同格式）。
+        "registers": registers,
+        "reads_dos": s.m.read_log.iter().rev().take(60).rev().map(|(st, h, a, want, got)| format!("#{st} h={h} -> {a:05x} want={want} got={got}")).collect::<Vec<_>>(),
+        "files": s.m.file_log.iter().rev().take(40).rev().map(|e| format!("#{} {:02x} {} -> {}", e.step, e.ah, e.name, e.result)).collect::<Vec<_>>(),
+        "sb": {"dma_request_count": s.m.bus.sb.dma_request_count, "dma_requests": format!("{:?}", s.m.bus.sb.dma_requests), "rate": s.m.bus.sb.rate, "speaker_on": s.m.bus.sb.speaker_on},
+        "irq7_delivered": s.m.irq7_delivered,
     });
     fs::write(a.out.join("report.json"), serde_json::to_string_pretty(&report).unwrap()).map_err(|e| e.to_string())?;
     println!("executed={} events={} translated={} error={}", s.m.cpu.steps, s.events, s.translated, report["error"]);

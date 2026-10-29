@@ -33,7 +33,7 @@
    "id": "image-localization",
    "layer": "kgb",
    "title": "語系圖片中文化（字卡等）",
-   "body": "開場字卡「Moscow, August 1991...」不經文字 routine，推測為 TCD1A.SCR（另有 D、F、S 版）。TCD2*、TH*.SQX 也可能是語系圖片。第一段結束時另有字卡「Some days before...」。",
+   "body": "開場字卡「Moscow, August 1991...」不經文字 routine，推測為 TCD1A.SCR（另有 D、F、S 版）。TCD2*、TH*.SQX 也可能是語系圖片。第一段結束時另有字卡「Some days before...」。 第一章另有：動作選單（右鍵，HIDE、TALK、GO、USE、MOVE、SMART POINTER、FIGHT、LISTEN、LOOK、KNOCK 為圖片按鈕，ex-help2）、游標旁的 LOOK 標籤。",
    "acceptance": "取證 SCR 格式與顯示路徑，定出圖片覆繪或替換方式的規格。",
    "verify": {
     "kind": "manual",
@@ -60,17 +60,6 @@
    "verify": {
     "kind": "manual",
     "note": "規格完成後改綁"
-   }
-  },
-  {
-   "id": "help-video-hang",
-   "layer": "core",
-   "title": "第一章說明影片在 FerroGolem 卡住",
-   "body": "第一章辦公室右鍵（或一段時間後）開始播放說明影片（推測 HELP.BGF），畫面停在第一格，時鐘不再更新；ex-scan6 從 1.09B 到 1.5B 步沒有進展，停在 188b:2ecf（反覆檢查 [0674] 是否改變，推測由中斷更新的畫格計數）。開場影片在同一核心可正常播放。",
-   "acceptance": "與 kgb-oracle 同輸入對照，找出 [0674] 的更新來源並在 FerroGolem 補齊；說明影片播放完畢回到場景。",
-   "verify": {
-    "kind": "manual",
-    "note": "修正後改綁實機收據"
    }
   }
  ]
