@@ -29,6 +29,14 @@ mkdir -p "$WP/cargo" "$WP/target" "$WP/runs"
 
 docker image inspect "$IMAGE" >/dev/null 2>&1 || { echo "找不到映像 $IMAGE" >&2; exit 1; }
 
+# 新建暫存層時放入原版設定檔，並把第 5 位元組（[061d] 字幕旗標，docs/re/005）設為 FFh，
+# 說明影片預設顯示字幕供中文覆繪。已有的設定檔不動。
+new_cfg() {
+  test -f "$1/CSP.CFG" && return 0
+  cp "$WP/disc/CSP.CFG" "$1/"
+  printf '\377' | dd of="$1/CSP.CFG" bs=1 seek=5 conv=notrunc status=none
+}
+
 base=(docker run --rm -u "$(id -u):$(id -g)"
   --memory 6g --cpus 4 --pids-limit 512
   --log-opt max-size=10m --log-opt max-file=3
@@ -64,7 +72,7 @@ case "$cmd" in
     run="$WP/runs/$name"
     test ! -e "$run" || { echo "$run 已存在，換一個輸出名" >&2; exit 1; }
     mkdir -p "$run/scratch/KGB" "$WP/inputs"
-    cp "$WP/disc/CSP.CFG" "$run/scratch/KGB/"
+    new_cfg "$run/scratch/KGB"
     tsv=(); for f in "$ROOT"/text/*.zh-TW.tsv; do test -f "$f" && tsv+=(--tsv "/text/$(basename "$f")"); done
     timeout 3600 docker run --rm -u "$(id -u):$(id -g)" --name "dgrs-kgb-$name" \
       --memory 3g --cpus 1 --pids-limit 64 --network none \
@@ -82,7 +90,7 @@ case "$cmd" in
     font_dir=/usr/share/fonts/opentype/noto
     test -f "$font_dir/NotoSansCJK-Medium.ttc" || { echo "找不到 Noto Sans CJK" >&2; exit 1; }
     mkdir -p "$WP/play/scratch/KGB"
-    test -f "$WP/play/scratch/KGB/CSP.CFG" || cp "$WP/disc/CSP.CFG" "$WP/play/scratch/KGB/"
+    new_cfg "$WP/play/scratch/KGB"
     gpu=(); if test -c /dev/dri/renderD128; then gpu=(--device /dev/dri/renderD128 --group-add "$(stat -c %g /dev/dri/renderD128)"); fi
     auth=(); xa="${XAUTHORITY:-$HOME/.Xauthority}"; if test -f "$xa"; then auth=(-v "$xa:/tmp/xauth:ro" -e XAUTHORITY=/tmp/xauth); fi
     # 語系變數照主機傳入，kgb-play 依此選預設語言（未設定的變數不會傳）。
@@ -100,7 +108,7 @@ case "$cmd" in
     name="${1:?輸出名}"; secs="${2:?秒數}"; shift 2
     test -x "$WP/target/release/kgb-play" || { echo "先跑 tools/rust.sh build" >&2; exit 1; }
     run="$WP/runs/$name"; test ! -e "$run" || { echo "$run 已存在" >&2; exit 1; }
-    mkdir -p "$run/scratch/KGB" "$run/fb"; cp "$WP/disc/CSP.CFG" "$run/scratch/KGB/"
+    mkdir -p "$run/scratch/KGB" "$run/fb"; new_cfg "$run/scratch/KGB"
     timeout $((secs + 60)) docker run --rm --init -u "$(id -u):$(id -g)" --name "dgrs-gui-$name" \
       --memory 3g --cpus 3 --pids-limit 256 --network none --log-opt max-size=10m --log-opt max-file=3 \
       -e HOME=/tmp -e WGPU_BACKEND=vulkan -v "$WP/target/release:/tool:ro" -v "$WP/disc/cd:/game:ro" \
