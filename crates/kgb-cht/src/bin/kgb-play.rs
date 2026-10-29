@@ -6,6 +6,7 @@
 //!          --text <譯文目錄> --font <Noto Sans CJK ttc> [--lang zh-TW|zh-CN|en] [--cycles 20000]
 //!
 //! 譯文目錄下的 `*.zh-TW.tsv` 給繁中、`*.zh-CN.tsv` 給簡中；字型取 TTC 的 TC（3）與 SC（2）。
+//! 同目錄的 `sprite-labels.tsv` 是圖塊文字標籤表（docs/spec/005）。
 use ferrogolem_core::machine::DEFAULT_IPS;
 use ferrogolem_frontend::{Guest, UiFont, egui, run};
 use kgb_cht::catalog::Catalog;
@@ -38,6 +39,7 @@ impl Kgb {
             None => Catalog::default(),
         };
         let old = self.s.set_text(incoming, to == Lang::En);
+        self.s.sprites.simplified = to == Lang::ZhCn;
         if let Some(t) = self.texts.iter_mut().find(|t| t.lang == self.lang) {
             t.catalog = Some(old);
         }
@@ -127,6 +129,11 @@ fn main_inner() -> Result<(), String> {
     let start = texts.iter_mut().find(|t| t.lang == lang).and_then(|t| t.catalog.take()).unwrap_or_default();
     let mut s = Session::new(&root.ok_or("缺 --root")?, &scratch.ok_or("缺 --scratch")?, cycles * 1000, start)?;
     s.take.passthrough = lang == Lang::En;
+    // 圖塊文字標籤表（docs/spec/005）；沒有這個檔就不畫圖塊譯文。
+    if let Ok(tsv) = std::fs::read_to_string(text.join("sprite-labels.tsv")) {
+        s.sprites = kgb_cht::sprites::Sprites::new(kgb_cht::sprites::parse_labels(&tsv)?);
+        s.sprites.simplified = lang == Lang::ZhCn;
+    }
     // 介面字用 TC；Noto Sans CJK 每個 collection 都含繁簡字形，「简中」照樣顯示。
     let ui = UiFont { bytes: std::fs::read(&font).map_err(|e| e.to_string())?, index: 3 };
     run("KGB 中文版（FerroGolem）", [960.0, 660.0], Some(ui), Box::new(Kgb { s, lang, texts }))

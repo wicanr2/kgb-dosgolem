@@ -195,19 +195,69 @@ fn draw_text(g: &mut Glyphs, out: &mut [u8], text: &str, x: i32, top: i32, px: u
     }
 }
 
+/// 圖塊上的文字補丁（docs/spec/005）：以底色填滿原版 320×200 座標的矩形，再把譯文置中畫上，
+/// 不描邊。譯文比矩形寬時，底色向兩側延伸到蓋住譯文。
+#[derive(Clone, Debug, PartialEq)]
+pub struct Patch {
+    pub x: i32,
+    pub y: i32,
+    pub w: i32,
+    pub h: i32,
+    pub bg: [u8; 3],
+    pub fg: [u8; 3],
+    pub text: String,
+}
+
+fn draw_patch(g: &mut Glyphs, out: &mut [u8], p: &Patch) {
+    let s = SCALE as i32;
+    let px = ((p.h * s) as u32 * 85 / 100).max(10);
+    let tw: i32 = p.text.chars().map(|c| g.advance(c, px)).sum();
+    let (mut x0, mut x1) = (p.x * s, (p.x + p.w) * s);
+    let cx = (x0 + x1) / 2;
+    if tw + 2 * s > x1 - x0 {
+        (x0, x1) = (cx - tw / 2 - s, cx + tw / 2 + s);
+    }
+    let (y0, y1) = (p.y * s, (p.y + p.h) * s);
+    for y in y0.max(0)..y1.min(H as i32) {
+        for x in x0.max(0)..x1.min(W as i32) {
+            out[(y as usize * W + x as usize) * 3..(y as usize * W + x as usize) * 3 + 3].copy_from_slice(&p.bg);
+        }
+    }
+    let top = y0 + ((y1 - y0) - px as i32) / 2;
+    let pad = OUTLINE_RADIUS.ceil() as i32 + 2;
+    if !g.lines.contains_key(&(p.text.clone(), px)) {
+        let b = line_bitmap(g, &p.text, px);
+        g.lines.insert((p.text.clone(), px), b);
+    }
+    let b = &g.lines[&(p.text.clone(), px)];
+    for cy in 0..b.h {
+        for cx2 in 0..b.w {
+            let a = b.alpha[cy * b.w + cx2];
+            let (ox, oy) = (cx - tw / 2 - pad + cx2 as i32, top - pad + cy as i32);
+            if a == 0 || ox < 0 || oy < 0 || ox >= W as i32 || oy >= H as i32 {
+                continue;
+            }
+            blend(out, (oy as usize * W + ox as usize) * 3, p.fg, a);
+        }
+    }
+}
+
 /// 字型大小：原版行高 × 倍率的 0.9。
 pub fn font_px(line_height: u16) -> u32 {
     (u32::from(line_height.max(8)) * SCALE as u32 * 9 / 10).max(12)
 }
 
 /// 放大原版畫面並畫上覆繪項目。dac 為 256 色 8 位元 RGB。
-pub fn compose(rgb320: &[u8], items: &[Item], dac: &[[u8; 3]; 256], g: &mut Glyphs) -> Vec<u8> {
+pub fn compose(rgb320: &[u8], items: &[Item], patches: &[Patch], dac: &[[u8; 3]; 256], g: &mut Glyphs) -> Vec<u8> {
     let mut out = vec![0; W * H * 3];
     for y in 0..H {
         for x in 0..W {
             let s = ((y / SCALE) * 320 + x / SCALE) * 3;
             out[(y * W + x) * 3..(y * W + x) * 3 + 3].copy_from_slice(&rgb320[s..s + 3]);
         }
+    }
+    for p in patches {
+        draw_patch(g, &mut out, p);
     }
     for it in items {
         let e = &it.event;

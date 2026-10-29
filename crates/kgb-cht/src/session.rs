@@ -4,6 +4,7 @@
 use crate::catalog::{Catalog, key_of};
 use crate::lifecycle::Screen;
 use crate::overlay::{self, Glyphs, Item};
+use crate::sprites::Sprites;
 use crate::takeover::{BLOCK_DATA, Segment, Takeover, TextEvent, normalize};
 use std::collections::HashMap;
 use ferrogolem_core::cpu::{AX, CS, Cpu, DI, DS, ES, SP, SS};
@@ -26,6 +27,14 @@ pub struct Session {
     /// 片語解碼器 `53d8` 的呼叫紀錄（TSV，含表頭），只觀測、不改狀態；`None` 時不記。
     /// 取證多片語區塊用（worklist composite-blocks）。
     pub phrase_log: Option<String>,
+    /// 圖塊文字覆繪（docs/spec/005）。
+    pub sprites: Sprites,
+    /// 取證用：從某步數起，依寫入指令的 CS:IP 彙整畫面寫入（次數、首次步數、位址範圍）。
+    pub writers: Option<(u64, std::collections::BTreeMap<(u16, u16), (u64, u64, usize, usize)>)>,
+    /// 取證用：進入這些 load segment 內偏移時記錄呼叫者（近返回位址）與暫存器。
+    pub trace_at: Option<(Vec<u16>, String)>,
+    /// 取證用：從某步數起記錄進入驅動程式跳躍表（驅動段 0100h–01FFh）的呼叫與暫存器。
+    pub driver_log: Option<(u64, String)>,
     /// 進行中的 `53d8`、`56d5` 呼叫。
     frames: Vec<Frame>,
     /// 各區塊（ES, DI）已完成的片語與插槽範圍（docs/spec/004 §7、§8）。
@@ -63,6 +72,10 @@ impl Session {
             events: 0,
             translated: 0,
             phrase_log: None,
+            sprites: Sprites::default(),
+            writers: None,
+            driver_log: None,
+            trace_at: None,
             frames: Vec::new(),
             segments: HashMap::new(),
         })
@@ -73,6 +86,34 @@ impl Session {
         while self.m.cpu.steps < until && !self.m.exited {
             if self.m.cpu.s[CS] == self.m.psp.wrapping_add(0x10) {
                 self.track_segments();
+                if !self.take.passthrough {
+                    self.sprites.observe(&self.m);
+                }
+                if let Some((at, log)) = &mut self.trace_at {
+                    let c = &self.m.cpu;
+                    if at.contains(&c.ip) {
+                        use ferrogolem_core::cpu::{BP, BX, CX, DX, SI};
+                        let ret = self.m.bus.word(Cpu::address(c.s[SS], c.r[SP]));
+                        let _ = writeln!(
+                            log,
+                            "{}\t{:04x}\t{:04x}\tAX={:04x} BX={:04x} CX={:04x} DX={:04x} SI={:04x} DI={:04x} BP={:04x} DS={:04x} ES={:04x}",
+                            c.steps, c.ip, ret, c.r[AX], c.r[BX], c.r[CX], c.r[DX], c.r[SI], c.r[DI], c.r[BP], c.s[DS], c.s[ES]
+                        );
+                    }
+                }
+            }
+            if let Some((from, log)) = &mut self.driver_log {
+                let c = &self.m.cpu;
+                // 驅動段＝load segment＋3955h（188Bh→51E0h，docs/spec/004 §2 的字形驅動）。
+                if c.steps >= *from && c.s[CS] == self.m.psp.wrapping_add(0x10 + 0x3955) && (0x100..0x200).contains(&c.ip) {
+                    let st = |o: u16| self.m.bus.word(Cpu::address(c.s[SS], c.r[SP].wrapping_add(o)));
+                    let _ = writeln!(
+                        log,
+                        "{}\t{:04x}\t{:04x}:{:04x}\tAX={:04x} BX={:04x} CX={:04x} DX={:04x} SI={:04x} DI={:04x} BP={:04x} DS={:04x} ES={:04x}",
+                        c.steps, c.ip, st(2), st(0), c.r[AX], c.r[ferrogolem_core::cpu::BX], c.r[ferrogolem_core::cpu::CX], c.r[ferrogolem_core::cpu::DX],
+                        c.r[ferrogolem_core::cpu::SI], c.r[DI], c.r[ferrogolem_core::cpu::BP], c.s[DS], c.s[ES]
+                    );
+                }
             }
             if let Some(mut e) = self.take.intercept(&mut self.m) {
                 if e.kind == crate::takeover::Kind::Block {
@@ -102,6 +143,16 @@ impl Session {
             }
             self.m.step()?;
             if !self.m.bus.write_hits.is_empty() {
+                if let Some((from, map)) = &mut self.writers {
+                    if self.m.cpu.steps >= *from {
+                        let e = map.entry(self.m.cpu.start).or_insert((0, self.m.cpu.steps, usize::MAX, 0));
+                        for &a in &self.m.bus.write_hits {
+                            e.0 += 1;
+                            e.2 = e.2.min(a);
+                            e.3 = e.3.max(a);
+                        }
+                    }
+                }
                 self.screen.on_writes(self.m.cpu.steps, &self.m.bus.write_hits);
                 self.m.bus.write_hits.clear();
             }
@@ -161,12 +212,18 @@ impl Session {
     }
 
     /// 原版 320×200 時合成 3 倍中文覆繪，其他模式原樣回傳。
-    pub fn compose(&self, glyphs: Option<&mut Glyphs>) -> (usize, usize, Vec<u8>) {
+    pub fn compose(&mut self, glyphs: Option<&mut Glyphs>) -> (usize, usize, Vec<u8>) {
         let (w, h, rgb) = self.m.bus.rgb();
         match (glyphs, w, h) {
             (Some(g), 320, 200) => {
                 let dac = self.m.bus.vga.dac.map(|c| c.map(|x| (x << 2) | (x >> 4)));
-                (overlay::W, overlay::H, overlay::compose(&rgb, &self.screen.items(), &dac, g))
+                let patches = if self.take.passthrough || self.m.bus.vga.mode != 0x13 {
+                    Vec::new()
+                } else {
+                    let indexed = self.m.bus.vga.indexed13(&self.m.bus.ram[0xa0000..0xb0000]);
+                    self.sprites.patches(&indexed, &dac, self.m.cpu.steps, self.m.ips)
+                };
+                (overlay::W, overlay::H, overlay::compose(&rgb, &self.screen.items(), &patches, &dac, g))
             }
             _ => (w, h, rgb),
         }

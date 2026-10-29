@@ -80,7 +80,7 @@ case "$cmd" in
       -v "$WP/target/release:/tool:ro" -v "$WP/disc/cd:/game:ro" -v "$ROOT/text:/text:ro" \
       -v "$font_dir:/fonts:ro" -v "$WP/inputs:/inputs:ro" -v "$run:/run" "$IMAGE" \
       /tool/kgb-run --root /game --scratch /run/scratch --out /run/out --steps "$steps" \
-      --font /fonts/NotoSansCJK-Medium.ttc --font-index 3 "${tsv[@]}" "${extra[@]}"
+      --font /fonts/NotoSansCJK-Medium.ttc --font-index 3 "${tsv[@]}" --labels /text/sprite-labels.tsv "${extra[@]}"
     ;;
   play)
     # 在本機 X11 桌面開視窗玩。存檔留在 workplace/play/scratch。

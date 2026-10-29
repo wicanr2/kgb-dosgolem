@@ -6,5 +6,6 @@ pub mod lang;
 pub mod lifecycle;
 pub mod overlay;
 pub mod session;
+pub mod sprites;
 pub mod takeover;
 pub mod zhcn;

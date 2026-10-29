@@ -33,8 +33,8 @@
    "id": "image-localization",
    "layer": "kgb",
    "title": "語系圖片中文化（字卡等）",
-   "body": "開場字卡「Moscow, August 1991...」不經文字 routine，推測為 TCD1A.SCR（另有 D、F、S 版）。TCD2*、TH*.SQX 也可能是語系圖片。第一段結束時另有字卡「Some days before...」。 第一章另有：動作選單（右鍵，HIDE、TALK、GO、USE、MOVE、SMART POINTER、FIGHT、LISTEN、LOOK、KNOCK 為圖片按鈕，ex-help2）、游標旁的 LOOK 標籤。",
-   "acceptance": "取證 SCR 格式與顯示路徑，定出圖片覆繪或替換方式的規格。",
+   "body": "已完成（spec 005）：動作選單、物品選單、游標動詞（SPRA.ANC 圖塊 1–11、15、16）以 hook 85f3、7093 取得位置，覆繪中文（ex-spr2、ex-spr3）。未完成：開場字卡（TCD1A.SCR「Moscow, August 1991...」、TCD2A.SCR「Some days before...」）、物品選單與其他圖塊的實機驗證、其他章節的圖檔。",
+   "acceptance": "開場字卡以中文顯示；物品選單實機驗證；以實機截圖收據驗證。",
    "verify": {
     "kind": "manual",
     "note": "規格完成後改綁該規格"
