@@ -1,0 +1,69 @@
+# KGB 譯名表。四欄：原文、繁中（台灣用語）、簡中（大陸用語，空白＝由繁中轉換）、依據。不是翻譯家族檔。
+# 繁中由翻譯者照用；簡中欄由 tools/to_zh_cn.py 在轉換時覆寫。俄語人名地名依新華社音譯，台灣另有慣用譯名者繁中取台灣慣用。
+Maksim Mikhailovich Rukov	馬克西姆·米哈伊洛維奇·魯科夫		新華社俄語音譯（Максим Михайлович Руков）
+Maksim	馬克西姆		同上
+Mikhailovich	米哈伊洛維奇		同上
+Rukov	魯科夫		同上
+Maks	馬克斯		Maksim 的暱稱
+Vanya	萬尼亞		新華社（Ваня）
+Vovlov	沃夫洛夫		新華社音譯
+Belov	別洛夫		新華社（Белов）
+Galushkin	加盧什金		新華社（Галушкин）
+Golitsin	戈利岑		新華社（Голицын）
+Pyotr Denisovich Golitsin	彼得·傑尼索維奇·戈利岑		新華社
+Sytenko	瑟堅科		新華社（Сытенко）
+Kruglov	克魯格洛夫		新華社（Круглов）
+Rita	麗塔		新華社
+Verto	韋爾托		音譯
+Lyonka	廖恩卡		新華社（Лёнька）
+Petka	彼季卡		新華社（Петька）
+Pyotr	彼得		慣用
+Belussov	別盧索夫		新華社
+Pavel Belussov	帕維爾·別盧索夫		新華社
+Fyodor Yasakev	費奧多爾·亞薩克夫		新華社
+Yasakev	亞薩克夫		新華社
+Ryumin	留明		新華社（Рюмин）
+Chevchenkova	舍甫琴科娃		慣用（Шевченкова）
+Shevkova	舍甫科娃		新華社
+Yuri	尤里		慣用
+Oleg	奧列格		慣用
+Mitya	米佳		慣用
+Roman	羅曼		慣用
+Klara	克拉拉		慣用
+Gleb	格列布		慣用
+Yegor	葉戈爾		慣用
+Valeri	瓦列里		慣用
+Pasha	帕沙		慣用
+Nakhimov	納希莫夫		新華社
+Gorbachev	戈巴契夫	戈尔巴乔夫	台灣慣用；簡中取新華社
+Lefortovo	列福爾托沃		新華社；Lefortovo prison＝列福爾托沃監獄
+Moscow	莫斯科		共同
+Kursk street	庫爾斯克街		新華社
+Red October St	紅十月街		意譯
+Hollywood	「好萊塢」		犯罪首腦代號，保留引號
+Buyer 2	「買家二號」		主角的接頭代號
+Romeo	羅密歐		線人代號
+Enthusiastic Progress Club	熱情進步俱樂部		俱樂部名
+Department P	P 處		KGB 部門
+KGB Second Directorate	KGB 第二總局		KGB 部門
+KGB	KGB		遊戲標題，保留原文
+GRU	格魯烏		蘇聯軍事情報局；首次出現可附「（蘇聯軍事情報局）」
+Spetsnaz	特種部隊		首次出現附原文（Spetsnaz）
+Militia	民警		蘇聯警察
+Party	黨		指蘇聯共產黨
+comrade	同志		稱謂
+Soviet	蘇聯		共同
+USSR	蘇聯		共同
+putsch	政變		1991 年 8 月蘇聯政變
+perestroika	改革重建		共同
+Tajikistan	塔吉克	塔吉克斯坦	台灣慣用；簡中取大陸慣用
+TV	電視		共同
+VCR	錄影機		共同
+ID	證件		共同
+Melnik	梅爾尼克		新華社（衛兵姓）
+Surzpoi	蘇爾茲波伊		音譯，非常見俄語姓
+Lyalin	利亞林		新華社（衛兵姓）
+captain	上尉		軍銜；comrade captain＝上尉同志；帶姓：魯科夫上尉同志
+colonel	上校		軍銜；comrade colonel Galushkin＝加盧什金上校同志
+major	少校		軍銜；major Vovlov＝沃夫洛夫少校
+lieutenant	中尉		軍銜；lieutenant Shevkova＝舍甫科娃中尉

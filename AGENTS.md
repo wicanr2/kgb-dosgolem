@@ -27,7 +27,9 @@ tools/rust.sh gui-check <輸出名> <秒數>  # Xvfb＋lavapipe 無頭跑視窗�
 - 模擬器（2026-10-29 改定）：另開 repo FerroGolem，clean-room、RRSAL，以 MVP 方式先讓 KGB 可玩，比照 dosgolem-rust-san5。核心已從本庫搬過去，契約見 `~/cht/ferrogolem/AGENTS.md`。本庫依賴它，不再放核心程式。
 - 對拍基準：`~/cht/dosgolem-rust` 分支 `kgb-oracle`（rust-dos）。不再執行 Go dosgolem。
 - 儲存庫：本機目錄 `~/cht/kgb`，私人 GitHub `wicanr2/dosgolem-rs`。使用者已授權建立。
-- 譯文用語（2026-10-29）：兩岸共同用語，這是大陸夥伴的需求；字形維持繁體。細則見 `text/TRANSLATING.md`，譯名見 `text/glossary-zh-TW.tsv`（俄語專名依新華社音譯，兩岸譯名不同時取新華社）。
+- 兩個中文版本（2026-10-29，取代同日的「兩岸共同用語」）：繁中（zh-TW，台灣用語）與簡中（zh-CN，大陸用語）。翻譯只產繁中；簡中由 OpenCC `tw2sp` 從繁中轉換，再以 `text/glossary.tsv` 的簡中欄覆寫專名，產物進版控、工具可重生比對。細則見 `text/TRANSLATING.md`。
+- 語言選單（2026-10-29）：工具列可選繁中、簡中、英文原版（關閉接手與覆繪、原版照畫）。預設依系統語系：zh-TW、zh-HK、zh-MO 為繁中，zh-CN、zh-SG 為簡中，其他語系預設繁中。
+- 試作第 1 批的譯文風格使用者已確認（2026-10-29）。
 - 翻譯來源：英文為主，法文對照。Cryo 是法國開發商，法文當語意交叉參照。A 與 U 兩組英文章節檔先查證差異再擇一當比對鍵。
 - 中文化範圍：遊戲內文字與介面、影片字幕（`INTRO.BGF`、`HELP.BGF`）、發行打包。
 - 文字接手（2026-10-29）：攔截 KGB 的文字 routine，跳過原版英文繪字，中文畫在放大 3 倍的高解析覆繪層。原版記憶體仍不寫入；因英文不再進畫面，中文化路徑的對拍改比「文字事件」（原文、呼叫點、座標），不比像素。
