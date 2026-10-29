@@ -1,0 +1,20 @@
+# 原版與衍生資料不進 Git（見 AGENTS.md 第 2 節）
+*.zip
+*.iso
+*.ISO
+*.bin
+*.cue
+*.mdf
+*.mds
+*.exe
+*.EXE
+*.com
+*.COM
+*.i64
+*.idb
+*.BGF
+*.SQX
+*.png
+*.wav
+/workplace/
+/target/
