@@ -99,6 +99,7 @@ mod tests {
                 line_height: 9,
                 color: 254,
                 font_seg: 0,
+                taken: true,
             },
             zh: "字".into(),
         }

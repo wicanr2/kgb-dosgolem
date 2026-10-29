@@ -86,7 +86,7 @@ fn run(a: Args) -> Result<bool, String> {
     let mut screen = Screen::default();
     // 生命週期依 mode 13h 畫面寫入判斷（docs/spec/004 §5）。
     m.bus.write_watch = Some((0xa0000, 0xaf9ff));
-    let mut log = String::from("step\tkind\tsite\tx\ty\tlines\tlh\tcolor\ttranslated\tkey\n");
+    let mut log = String::from("step\tkind\tsite\tx\ty\tlines\tlh\tcolor\ttranslated\tkey\ttaken\n");
     let (mut events, mut translated) = (0u64, 0u64);
     let mut error = None;
     let mut next_shot = a.shots;
@@ -97,16 +97,26 @@ fn run(a: Args) -> Result<bool, String> {
             translated += u64::from(zh.is_some());
             let _ = writeln!(
                 log,
-                "{}\t{:?}\t{:04x}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                "{}\t{:?}\t{:04x}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
                 e.step, e.kind, e.site, e.x, e.y, e.max_lines, e.line_height, e.color,
-                u8::from(zh.is_some()), key_of(&e.text)
+                u8::from(zh.is_some()), key_of(&e.text), u8::from(e.taken)
             );
             // 未譯的句子以英文原文畫在覆繪層，不讓文字消失。
-            let shown = zh.map_or_else(|| String::from_utf8_lossy(&e.text).replace('^', "\n"), str::to_string);
-            if !e.text.is_empty() {
+            // 原版 86e9 只畫前 max_lines 行（BP），英文退路照做。
+            let shown = zh.map_or_else(
+                || {
+                    let s = String::from_utf8_lossy(&e.text);
+                    s.split('^').take(usize::from(e.max_lines.max(1))).collect::<Vec<_>>().join("\n")
+                },
+                str::to_string,
+            );
+            let taken = e.taken;
+            if taken && !e.text.is_empty() {
                 screen.on_event(Item { event: e, zh: shown });
             }
-            continue;
+            if taken {
+                continue;
+            }
         }
         if let Err(e) = m.step() {
             error = Some(e);
