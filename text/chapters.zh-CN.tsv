@@ -1,3 +1,6 @@
 # 由 kgb-zhcn 從 chapters.zh-TW.tsv 產生，不要手改；改繁中或譯名表後重產。
-# KGB 章节标题（调用点 188b:1d97）。三栏：key（原版英文）、译文、出处。来源档尚未取证，键取自运行期文字事件。
+# KGB 章节标题（调用点 188b:1d97）。三栏：key（原版英文）、译文、出处。文字在 LANG 资源段（第一章 5411h，docs/re/004），第一章的键取自运行期文字事件。
 Moscow, August 14, 1991. KGB Department P...	莫斯科，1991 年 8 月 14 日。KGB P 处……	chapter:1d97#1
+Leningrad, Friday August 16, 1991. Hotel Gostinitsa...	列宁格勒，1991 年 8 月 16 日星期五。戈斯季尼察饭店……	chapter:1d97#2
+Leningrad, Saturday August 17, 1991. The docks...	列宁格勒，1991 年 8 月 17 日星期六。码头……	chapter:1d97#3
+Leningrad, Sunday August 18, 1991. The docks...	列宁格勒，1991 年 8 月 18 日星期日。码头……	chapter:1d97#4

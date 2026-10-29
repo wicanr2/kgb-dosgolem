@@ -11,7 +11,7 @@
    "id": "english-track",
    "layer": "kgb",
    "title": "各章使用哪一組英文檔",
-   "body": "第一章開 CHAP1U.*（docs/re/004）。CHAP2 沒有 U 組，第二章用哪組未量。",
+   "body": "第一章開 CHAP1U.*（docs/re/004）。第二到四章的譯文以 CHAP2A、CHAP3U、CHAP4U 為比對鍵（kgb-extract --chapter 載入）；遊戲實際進第二章以後開哪組檔未量。",
    "acceptance": "各章實際開檔紀錄。",
    "verify": {
     "kind": "manual",
@@ -49,6 +49,17 @@
    "verify": {
     "kind": "manual",
     "note": "校對完成後改綁實機事件收據"
+   }
+  },
+  {
+   "id": "chapters2-4-review",
+   "layer": "kgb",
+   "title": "第二到四章譯文實機校對",
+   "body": "已譯：text/chapter2（CHAP2A，2,501 key）、chapter3（CHAP3U，298 key）、chapter4（CHAP4U，768 key），說明影片 THA2–THA4（help-ch234，172 key）。各章片語彼此不重疊，也不與第一章重疊。尚未實機走過任何一章；子代理標記的疑點：說話者與人稱（第三章 2593、2626，第四章 645、1011–1026、1239–1270）、被 # 截斷的句子、門牌職稱（第二章 3228–3237）、無法判斷是否顯示的編碼字串（第二章 3558、sdb76–sdb7f）。",
+   "acceptance": "實機走過各章主要場景，文字事件全部有譯文，疑點逐條定案。",
+   "verify": {
+    "kind": "manual",
+    "note": "需要能進到第二章以後的存檔或路徑；完成後改綁實機事件收據"
    }
   },
   {

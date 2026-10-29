@@ -1,0 +1,3 @@
+# CHAP3U 插槽範本譯文（docs/spec/004 §8），只列第一章沒有的範本。三欄：key（範本的 FNV-1a 64 雜湊）、譯文、出處。
+fnv64:0a9c67fafbbb5842	把{fa}扔進水裡。	CHAP3U:3416
+fnv64:7800520befd301bb	前往{fe}。	CHAP3U:3417

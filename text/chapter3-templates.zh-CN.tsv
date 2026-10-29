@@ -1,0 +1,4 @@
+# 由 kgb-zhcn 從 chapter3-templates.zh-TW.tsv 產生，不要手改；改繁中或譯名表後重產。
+# CHAP3U 插槽范本译文（docs/spec/004 §8），只列第一章没有的范本。三栏：key（范本的 FNV-1a 64 哈希）、译文、出处。
+fnv64:0a9c67fafbbb5842	把{fa}扔进水里。	CHAP3U:3416
+fnv64:7800520befd301bb	前往{fe}。	CHAP3U:3417
