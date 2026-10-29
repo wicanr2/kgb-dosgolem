@@ -6,7 +6,8 @@
 #   tools/rust.sh build            離線建置 release
 #   tools/rust.sh test             離線跑測試
 #   tools/rust.sh cargo <參數...>  離線執行任意 cargo 子命令（專案唯讀）
-#   tools/rust.sh probe <輸出名> <步數>
+#   tools/rust.sh probe <輸出名> <步數> [--dump] [--shots N] [--watch-read lo-hi]
+#   tools/rust.sh kgb <輸出名> <步數> [--shots N]   接手文字 routine，輸出事件與中文覆繪截圖
 #                                  原版 workplace/disc/cd 唯讀共用，每次執行只建可寫暫存層，
 #                                  在自有核心上跑 KGB 啟動器，輸出到 workplace/runs/<輸出名>
 #
@@ -45,7 +46,7 @@ case "$cmd" in
       -v "$ROOT:/project:ro" "$IMAGE" cargo "$@" --locked --offline
     ;;
   probe)
-    name="${1:?輸出名}"; steps="${2:?步數}"
+    name="${1:?輸出名}"; steps="${2:?步數}"; shift 2; extra=("$@")
     test -f "$WP/disc/manifest.json" || { echo "先跑 tools/extract_disc.py 解出 workplace/disc" >&2; exit 1; }
     test -x "$WP/target/release/dgrs-probe" || { echo "先跑 tools/rust.sh build" >&2; exit 1; }
     run="$WP/runs/$name"
@@ -59,7 +60,28 @@ case "$cmd" in
       -v "$WP/target/release:/tool:ro" -v "$WP/disc/cd:/game:ro" -v "$run:/run" "$IMAGE" \
       /tool/dgrs-probe --root /game --scratch /run/scratch --exe CSPPRG.EXE \
       --tail ' AMR ADP220 SBP2227 EMS 386 SAF WRIC:\KGB\' \
-      --steps "$steps" --out /run/out
+      --steps "$steps" --out /run/out "${extra[@]}"
+    ;;
+  kgb)
+    # 接手文字 routine 的無頭執行：輸出文字事件與 3 倍中文覆繪截圖。
+    name="${1:?輸出名}"; steps="${2:?步數}"; shift 2; extra=("$@")
+    test -f "$WP/disc/manifest.json" || { echo "先解出 workplace/disc" >&2; exit 1; }
+    test -x "$WP/target/release/kgb-run" || { echo "先跑 tools/rust.sh build" >&2; exit 1; }
+    font_dir=/usr/share/fonts/opentype/noto
+    test -f "$font_dir/NotoSansCJK-Medium.ttc" || { echo "找不到 $font_dir/NotoSansCJK-Medium.ttc" >&2; exit 1; }
+    mkdir -p "$ROOT/text"
+    run="$WP/runs/$name"
+    test ! -e "$run" || { echo "$run 已存在，換一個輸出名" >&2; exit 1; }
+    mkdir -p "$run/scratch/KGB"
+    cp "$WP/disc/CSP.CFG" "$run/scratch/KGB/"
+    tsv=(); for f in "$ROOT"/text/*.zh-TW.tsv; do test -f "$f" && tsv+=(--tsv "/text/$(basename "$f")"); done
+    timeout 3600 docker run --rm -u "$(id -u):$(id -g)" --name "dgrs-kgb-$name" \
+      --memory 3g --cpus 1 --pids-limit 64 --network none \
+      --log-opt max-size=10m --log-opt max-file=3 \
+      -v "$WP/target/release:/tool:ro" -v "$WP/disc/cd:/game:ro" -v "$ROOT/text:/text:ro" \
+      -v "$font_dir:/fonts:ro" -v "$run:/run" "$IMAGE" \
+      /tool/kgb-run --root /game --scratch /run/scratch --out /run/out --steps "$steps" \
+      --font /fonts/NotoSansCJK-Medium.ttc --font-index 3 "${tsv[@]}" "${extra[@]}"
     ;;
   *) echo "未知子命令 $cmd" >&2; exit 2 ;;
 esac

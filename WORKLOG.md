@@ -13,3 +13,9 @@
 - 自有核心 50M 步跑到 INTRO.BGF 開場與英文字幕，開檔順序前 14 檔與 Go 相同。
 - 發現時脈比例差異：本庫每 tick 約 3,200 道指令，Go 約 58,000 道。新增 worklist `cpu-clock`。
 - 測試期間一次 transfer 測試失敗是測試本身沒取走 reset 的 AAh，已修測試。
+- 清掉 13 份逐次複製的原版根目錄（3.0 GB）。核心加唯讀根目錄＋暫存層，探針改唯讀共用 `workplace/disc/cd`。
+- 找到 KGB 文字 routine：`188b:86e9`（區塊）、`87d8`（單行），字形經驅動 `51e0:12d1` 寫 `[440e]+值`。使用者定案：接手並跳過原版繪字、中文畫在 3 倍覆繪層（AGENTS.md §1、docs/spec/004）。
+- 新增 `crates/kgb-cht`：攔截、譯文表、Noto Sans CJK TC 覆繪、`kgb-run`。開場 80M 步攔到 6 句字幕，簽章全部相符。
+- 覆繪第一次沒字：`[440e]`＝254 在當時 DAC 為黑，實際字色是 255；依驅動程式碼改用 `[440e]+1`。
+- 使用者指示不再跑 Go dosgolem 當基準，改用 `~/cht/dosgolem-rust`（分支 `kgb-oracle`，worktree `~/workspace/dosgolem-rust-kgb`）。go-r4 的結果未採用。
+- 使用者決定另開新 repo FerroGolem：clean-room、RRSAL 的 Rust DOS 模擬器，以 MVP 方式先讓 KGB 能跑；本庫留作 KGB 中文化並依賴它。

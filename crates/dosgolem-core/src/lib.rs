@@ -9,4 +9,5 @@ mod font;
 pub mod machine;
 pub mod memory;
 pub mod mz;
+pub mod png;
 pub mod sb;

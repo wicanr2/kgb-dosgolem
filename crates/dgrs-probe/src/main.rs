@@ -17,6 +17,9 @@ struct Args {
     exe: String,
     tail: String,
     scratch: Option<PathBuf>,
+    dump: bool,
+    shots: u64,
+    watch_read: Option<(usize, usize)>,
     steps: u64,
     out: PathBuf,
 }
@@ -24,6 +27,7 @@ struct Args {
 fn parse() -> Result<Args, String> {
     let mut it = std::env::args().skip(1);
     let mut scratch = None;
+    let (mut dump, mut shots, mut watch_read) = (false, 0, None);
     let (mut root, mut exe, mut tail, mut steps, mut out) = (None, None, String::new(), 2_000_000, None);
     while let Some(k) = it.next() {
         let mut v = || it.next().ok_or(format!("{k} 需要值"));
@@ -32,6 +36,14 @@ fn parse() -> Result<Args, String> {
             "--exe" => exe = Some(v()?),
             "--tail" => tail = v()?,
             "--scratch" => scratch = Some(PathBuf::from(v()?)),
+            "--dump" => dump = true,
+            "--shots" => shots = v()?.parse().map_err(|e| format!("--shots：{e}"))?,
+            "--watch-read" => {
+                let s = v()?;
+                let (lo, hi) = s.split_once('-').ok_or("--watch-read 格式 lo-hi（十六進位）")?;
+                let p = |x: &str| usize::from_str_radix(x, 16).map_err(|e| format!("--watch-read：{e}"));
+                watch_read = Some((p(lo)?, p(hi)?));
+            }
             "--steps" => steps = v()?.parse().map_err(|e| format!("--steps：{e}"))?,
             "--out" => out = Some(PathBuf::from(v()?)),
             _ => return Err(format!("未知參數 {k}")),
@@ -42,57 +54,16 @@ fn parse() -> Result<Args, String> {
         exe: exe.ok_or("缺 --exe")?,
         tail,
         scratch,
+        dump,
+        shots,
+        watch_read,
         steps,
         out: out.ok_or("缺 --out")?,
     })
 }
 
-/// 未壓縮（stored deflate）的 RGB PNG，只用標準庫。
 fn png(w: usize, h: usize, rgb: &[u8]) -> Vec<u8> {
-    fn crc(data: &[u8]) -> u32 {
-        let mut c = !0u32;
-        for &b in data {
-            c ^= u32::from(b);
-            for _ in 0..8 {
-                c = if c & 1 != 0 { 0xedb8_8320 ^ (c >> 1) } else { c >> 1 };
-            }
-        }
-        !c
-    }
-    fn chunk(out: &mut Vec<u8>, kind: &[u8], data: &[u8]) {
-        out.extend((data.len() as u32).to_be_bytes());
-        let mut body = kind.to_vec();
-        body.extend(data);
-        out.extend(&body);
-        out.extend(crc(&body).to_be_bytes());
-    }
-    let mut raw = Vec::with_capacity(h * (w * 3 + 1));
-    for y in 0..h {
-        raw.push(0);
-        raw.extend(&rgb[y * w * 3..(y + 1) * w * 3]);
-    }
-    let mut z = vec![0x78, 0x01];
-    let blocks: Vec<&[u8]> = raw.chunks(65535).collect();
-    for (i, b) in blocks.iter().enumerate() {
-        z.push(u8::from(i + 1 == blocks.len()));
-        z.extend((b.len() as u16).to_le_bytes());
-        z.extend((!(b.len() as u16)).to_le_bytes());
-        z.extend(*b);
-    }
-    let (mut a, mut s) = (1u32, 0u32);
-    for &b in &raw {
-        a = (a + u32::from(b)) % 65521;
-        s = (s + a) % 65521;
-    }
-    z.extend(((s << 16) | a).to_be_bytes());
-    let mut out = b"\x89PNG\r\n\x1a\n".to_vec();
-    let mut ihdr = (w as u32).to_be_bytes().to_vec();
-    ihdr.extend((h as u32).to_be_bytes());
-    ihdr.extend([8, 2, 0, 0, 0]);
-    chunk(&mut out, b"IHDR", &ihdr);
-    chunk(&mut out, b"IDAT", &z);
-    chunk(&mut out, b"IEND", &[]);
-    out
+    dosgolem_core::png::encode_rgb(w, h, rgb)
 }
 
 fn run(a: Args) -> Result<bool, String> {
@@ -102,11 +73,37 @@ fn run(a: Args) -> Result<bool, String> {
         None => Machine::new(&a.root)?,
     };
     m.load_with_tail(&a.exe, a.tail.as_bytes())?;
+    m.bus.read_watch = a.watch_read;
     let mut error = None;
+    let mut reads: std::collections::BTreeMap<(u16, u16), (u64, u64, usize, usize)> = Default::default();
+    let mut next_shot = a.shots;
     while m.cpu.steps < a.steps && !m.exited {
         if let Err(e) = m.step() {
             error = Some(e);
             break;
+        }
+        if !m.bus.read_hits.is_empty() {
+            let e = reads.entry(m.cpu.start).or_insert((0, m.cpu.steps, usize::MAX, 0));
+            for &addr in &m.bus.read_hits {
+                e.0 += 1;
+                e.2 = e.2.min(addr);
+                e.3 = e.3.max(addr);
+            }
+            m.bus.read_hits.clear();
+        }
+        if a.shots > 0 && m.cpu.steps >= next_shot {
+            next_shot += a.shots;
+            let (w, h, rgb) = m.bus.rgb();
+            fs::write(a.out.join(format!("shot-{:010}.png", m.cpu.steps)), png(w, h, &rgb)).map_err(|e| e.to_string())?;
+        }
+    }
+    if a.dump {
+        m.ems.flush_all(&m.bus);
+        fs::write(a.out.join("ram.bin"), &m.bus.ram).map_err(|e| e.to_string())?;
+        let mut ems = Vec::new();
+        for (h, i, d) in m.ems.pages() {
+            fs::write(a.out.join(format!("ems-{h:04x}-{i:03}.bin")), d).map_err(|e| e.to_string())?;
+            ems.push(format!("{h:04x}-{i:03}"));
         }
     }
     let (cs, ip) = m.cpu.start;
@@ -130,6 +127,7 @@ fn run(a: Args) -> Result<bool, String> {
         "dma": {"mask": m.bus.dma.mask, "mode": m.bus.dma.mode, "base": m.bus.dma.base, "page": format!("{:?}", m.bus.dma.page)},
         "files": m.file_log.iter().map(|e| format!("#{} {:02x} {} -> {}", e.step, e.ah, e.name, e.result)).collect::<Vec<_>>(),
         "irq7_delivered": m.irq7_delivered,
+        "reads": reads.iter().map(|((cs, ip), (n, first, lo, hi))| format!("{cs:04x}:{ip:04x} n={n} first=#{first} {lo:05x}-{hi:05x}")).collect::<Vec<_>>(),
         "hooked_vectors": (0..256usize).filter(|n| m.bus.word(n * 4 + 2) != 0x80).map(|n| format!("{n:02x}={:04x}:{:04x}", m.bus.word(n * 4 + 2), m.bus.word(n * 4))).collect::<Vec<_>>(),
         "ems": {"handles": m.ems.layout(), "unsupported": m.ems.unsupported, "ops": m.ems.ops.iter().take(64).map(|o| json!({"step": o.step, "ah": o.ah, "al": o.al, "dx": o.handle, "bx": o.value, "status": o.status})).collect::<Vec<_>>()},
     });

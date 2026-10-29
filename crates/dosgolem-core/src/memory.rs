@@ -289,6 +289,9 @@ pub struct Memory {
     /// 8259 主片 IMR（埠 21h）。
     pub pic_mask: u8,
     pub fdc_dor: u8,
+    /// 觀測用：讀取落在此線性範圍（含首尾）時把位址記進 read_hits。
+    pub read_watch: Option<(usize, usize)>,
+    pub read_hits: Vec<usize>,
     /// IRQ 7 掛起（SB 傳輸結束）。
     pub irq7_pending: bool,
     sb_transfer: Option<Transfer>,
@@ -317,6 +320,8 @@ impl Default for Memory {
             dma: crate::dma::Dma8237::default(),
             pic_mask: 0,
             fdc_dor: 0x0c,
+            read_watch: None,
+            read_hits: Vec::new(),
             irq7_pending: false,
             sb_transfer: None,
             dac_out: Vec::new(),
@@ -434,6 +439,11 @@ impl Memory {
 impl Bus for Memory {
     fn read(&mut self, a: usize) -> u8 {
         let a = a & 0xfffff;
+        if let Some((lo, hi)) = self.read_watch {
+            if (lo..=hi).contains(&a) && self.read_hits.len() < 65536 {
+                self.read_hits.push(a)
+            }
+        }
         if (0xa0000..0xb0000).contains(&a) && self.vga.planar() {
             self.vga.read(a - 0xa0000)
         } else {

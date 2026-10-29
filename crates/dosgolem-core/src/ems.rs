@@ -93,6 +93,13 @@ impl Ems {
             self.flush(bus, p)
         }
     }
+    /// 所有邏輯頁（handle、頁號、內容）。先呼叫 flush_all 才含頁框內的最新寫入。
+    pub fn pages(&self) -> Vec<(u16, usize, &[u8])> {
+        self.handles
+            .iter()
+            .flat_map(|(&h, p)| p.iter().enumerate().map(move |(i, d)| (h, i, d.as_slice())))
+            .collect()
+    }
     /// 各 handle 的頁數。
     pub fn layout(&self) -> Vec<(u16, usize)> {
         self.handles.iter().map(|(&h, p)| (h, p.len())).collect()
