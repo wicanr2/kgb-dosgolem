@@ -1,5 +1,7 @@
 # 002 KGB 啟動缺口對照
 
+> 本文的「自有核心」指當時本庫的 `crates/dosgolem-core`，2026-10-29 已搬到 FerroGolem（`ferrogolem-core`）。文中的 docs/spec/002、003 現在是 FerroGolem 的 `docs/spec/002-ems.md`、`003-sound-blaster.md`。Go 基準的紀錄保留為歷史證據，之後的對拍改用 dosgolem-rust 分支 `kgb-oracle`。
+
 同一份輸入（docs/re/001 的 `workplace/disc`）、同一命令列尾 ` AMR ADP220 SBP2227 EMS 386 SAF WRIC:\KGB\`，`C:\KGB\CSP.CFG` 由 zip 內的同名檔提供。
 
 ## Go dosgolem 基準

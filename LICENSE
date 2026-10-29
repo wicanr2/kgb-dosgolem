@@ -2,7 +2,7 @@
 Retro Remake Source-Available License, version 1.0 (RRSAL-1.0)
 SPDX-License-Identifier: LicenseRef-RRSAL-1.0
 
-適用作品：dosgolem-rs 自有 Rust DOS 執行器與 KGB 繁體中文化（dosgolem-rs Rust DOS runtime and KGB Traditional Chinese localisation）
+適用作品：KGB 繁體中文化（dosgolem-rs）（KGB Traditional Chinese localisation (dosgolem-rs)）
 Copyright (c) 2026 Wang Chun-Yu (wicanr2) <wicanr2@gmail.com>
 
 繁體中文為準，英文譯本僅供參考（The Traditional Chinese text governs;
@@ -12,7 +12,7 @@ the English translation below is provided for convenience only）。
 
 前言
 
-本作品是對Cryo Interactive 1992 年 DOS 遊戲《KGB》及其 CD 版《Conspiracy》的自有 DOS 執行器與執行期繁體中文化，
+本作品是對Cryo Interactive 1992 年 DOS 遊戲《KGB》及其 CD 版《Conspiracy》的執行期繁體中文化（以 FerroGolem 模擬器接手文字 routine 並覆繪中文），
 目的是文化資產保存。著作權人希望它被廣泛使用、討論與展示，同時保留本作品的
 商業權利。本條款據此設計：非商業用途免費且寬鬆，商業用途保留給著作權人另行洽談。
 
@@ -41,12 +41,12 @@ the English translation below is provided for convenience only）。
   (b) 本條款不適用於原版素材。本作品不散布原版素材；使用本作品的人必須自備
       合法取得的原版副本。著作權人對原版素材不主張任何權利，也無權授權它們。
   (c) 本儲存庫為了文件、研究與展示的目的，收錄了少量含有原版素材的片段，
-      包括：原版光碟的檔名、大小與 SHA-256 雜湊，以及由原版量測得出的位址、格式與數值記錄。這些片段中屬於
+      包括：原版光碟的檔名、大小與 SHA-256 雜湊，由原版量測得出的位址、簽章位元組、格式與數值記錄，以及譯文檔案中作為比對鍵的原版英文字串。這些片段中屬於
       原版素材的部分不在本條款的授權範圍內；其收錄依據是研究與評論之目的。
       著作權人創作的譯文與量測所得的資料表屬於本作品，在著作權人享有權利的
       範圍內依本條款授權；譯文是原版文字的衍生著作，使用譯文重現遊戲仍以
       自備原版為前提。
-  (d) 本儲存庫或發行包中含有的第三方元件（例如 serde_json 等 Rust 相依套件，以及 font8x8 字型（Public Domain））依各自的授權條款提供，不受本條款拘束；其授權聲明
+  (d) 本儲存庫或發行包中含有的第三方元件（例如 fontdue、serde_json 等 Rust 相依套件；執行時使用的 Noto Sans CJK TC 字型（OFL-1.1）不隨本儲存庫提供）依各自的授權條款提供，不受本條款拘束；其授權聲明
       隨同散布。
 
 第 3 條　非商業授權
@@ -114,7 +114,7 @@ the English translation below is provided for convenience only）。
 
 第 8 條　名稱
 
-「dosgolem-rs 自有 Rust DOS 執行器與 KGB 繁體中文化」、「dosgolem-rs Rust DOS runtime and KGB Traditional Chinese localisation」及本儲存庫名稱是本作品的
+「KGB 繁體中文化（dosgolem-rs）」、「KGB Traditional Chinese localisation (dosgolem-rs)」及本儲存庫名稱是本作品的
 識別名稱。修改版可以說明自己「基於」本作品，但不得使用相同或近似的名稱作為
 修改版自己的名稱，除非取得著作權人書面同意。
 
@@ -154,7 +154,7 @@ the English translation below is provided for convenience only）。
 ────────────────────────────────────────────────────────────
 English translation (for convenience; the Chinese text governs)
 
-PREAMBLE. This work is a independent DOS runtime and run-time Traditional Chinese localisation of Cryo Interactive's 1992 DOS game "KGB" and its CD edition "Conspiracy", made for cultural
+PREAMBLE. This work is a run-time Traditional Chinese localisation (taking over the text routine and drawing Chinese as an overlay on the FerroGolem emulator) of Cryo Interactive's 1992 DOS game "KGB" and its CD edition "Conspiracy", made for cultural
 preservation. The copyright holder wants it widely used, discussed and shown,
 while keeping its commercial rights. This license is built accordingly:
 non-commercial use is free and permissive; commercial use is reserved for a
@@ -194,7 +194,7 @@ separate agreement with the copyright holder.
        the original game. The copyright holder claims no rights in Original
        Assets and cannot license them.
    (c) For documentation, research and demonstration this repository contains
-       small excerpts that include Original Assets: file names, sizes and SHA-256 hashes of the original disc, and addresses, formats and values measured from Original Assets. The Original-Asset portions of
+       small excerpts that include Original Assets: file names, sizes and SHA-256 hashes of the original disc; addresses, signature bytes, formats and values measured from Original Assets; and original English strings kept as lookup keys in translation files. The Original-Asset portions of
        these excerpts are outside this license and are included for research
        and commentary. Translations and measured tables authored by the
        copyright holder are part of the Work and are licensed under these
@@ -202,7 +202,7 @@ separate agreement with the copyright holder.
        translations are derivative of the original text, and using them to
        run the game still requires the user's own original copy.
    (d) Third-party components in this repository or its packages (for example
-       Rust dependencies such as serde_json, and the font8x8 font (Public Domain))
+       Rust dependencies such as fontdue and serde_json; the Noto Sans CJK TC font (OFL-1.1) used at run time is not shipped in this repository)
        are provided under their own licenses, which are distributed with them,
        and are not governed by this license.
 
@@ -283,7 +283,7 @@ separate agreement with the copyright holder.
        reasonable.
    (d) Do not submit a Contribution if you do not accept this Section.
 
-8. NAMES. "dosgolem-rs 自有 Rust DOS 執行器與 KGB 繁體中文化", "dosgolem-rs Rust DOS runtime and KGB Traditional Chinese localisation" and this
+8. NAMES. "KGB 繁體中文化（dosgolem-rs）", "KGB Traditional Chinese localisation (dosgolem-rs)" and this
    repository's name identify the Work. A Modified Version may state that it
    is based on the Work, but may not use the same or a confusingly similar
    name as its own name without the copyright holder's written consent.

@@ -8,88 +8,6 @@
  },
  "items": [
   {
-   "id": "mouse-int33",
-   "layer": "core",
-   "title": "滑鼠 int 33h 只有 AX=0",
-   "body": "Go 基準用到 0000、0003、0004、0007、0008。種子核心只回 AX=0 的「無滑鼠」。",
-   "acceptance": "依 Go dosgolem 滑鼠契約移植上述功能並接前端輸入。",
-   "verify": {
-    "kind": "absent",
-    "paths": [
-     "crates/dosgolem-core/src"
-    ],
-    "pattern": "fn mouse_call",
-    "note": "滑鼠分派函式出現即視為已接上"
-   }
-  },
-  {
-   "id": "vga-mode13",
-   "layer": "core",
-   "title": "VGA mode 13h 畫面與 DAC",
-   "body": "mode 13h 鏈結與非鏈結已接上（Go setMode13、Unchained256）。尚未與 Go 基準做同狀態 indexed 與色盤雜湊比對。",
-   "acceptance": "同狀態下 indexed 與色盤雜湊與 Go 基準相同。",
-   "verify": {
-    "kind": "manual",
-    "note": "完成後改綁 mode 13h 繪圖函式名或對拍收據數量"
-   }
-  },
-  {
-   "id": "sound-blaster",
-   "layer": "core",
-   "title": "SB 自動初始化 DMA 與聲音輸出",
-   "body": "DSP、mixer、8237、8 位元單次 DMA 與 IRQ 7 已接上（docs/spec/003）。自動初始化（1Ch）、16 位元、D0h／D4h 仍拒絕；傳出的位元組只記錄，未混音播放。OPL 只有計時器狀態。",
-   "acceptance": "KGB 音效與音樂路徑不停，前端能出聲。",
-   "verify": {
-    "kind": "present",
-    "paths": [
-     "crates/dosgolem-core/src/sb.rs"
-    ],
-    "pattern": "自動初始化仍未接上",
-    "note": "接上 1Ch 後同步刪掉該測試訊息並改測試"
-   }
-  },
-  {
-   "id": "mscdex",
-   "layer": "core",
-   "title": "MSCDEX int 2Fh AH=15h",
-   "body": "啟動器從 D: 讀資料。Go 基準掛了 MSCDEX，是否被查詢尚未量。",
-   "acceptance": "量出 KGB 用到的 MSCDEX 功能並依 Go docs/spec/434-mscdex-minimal 移植。",
-   "verify": {
-    "kind": "absent",
-    "paths": [
-     "crates/dosgolem-core/src"
-    ],
-    "pattern": "fn mscdex_call",
-    "note": "MSCDEX 分派函式出現即視為已接上"
-   }
-  },
-  {
-   "id": "cpu-clock",
-   "layer": "core",
-   "title": "CPU 時脈與 PIT 的比例",
-   "body": "種子以 PIT 分頻 × 4 週期為一次 IRQ0，KGB 設 PIT 約 200 Hz 時每 tick 約 3,200 道指令；Go 基準約 58,000 道。遊戲時間相對指令數過快，影片解碼可能掉格。",
-   "acceptance": "時脈成為可設定的機器參數並寫進規格，預設值依 KGB 目標機（386）與 DOSBox-X cycles 取證後決定。",
-   "verify": {
-    "kind": "present",
-    "paths": [
-     "crates/dosgolem-core/src/memory.rs"
-    ],
-    "pattern": "pub const CYCLES_PER_SECOND: u64 = 4 * 1_193_182;",
-    "note": "改成可設定參數後常數會消失"
-   }
-  },
-  {
-   "id": "boot-parity",
-   "layer": "core",
-   "title": "開機對拍：畫面雜湊",
-   "body": "自有核心開檔順序前 14 檔與 Go 基準相同，並跑到 INTRO.BGF（docs/re/002）。畫面雜湊未比；兩邊時脈不同使步數無法直接對位。",
-   "acceptance": "以同一時脈設定、同步數比 indexed 與色盤雜湊。",
-   "verify": {
-    "kind": "manual",
-    "note": "對拍工具完成後改綁收據"
-   }
-  },
-  {
    "id": "english-track",
    "layer": "kgb",
    "title": "A 與 U 英文章節檔擇一",
@@ -116,18 +34,59 @@
    }
   },
   {
-   "id": "gui",
-   "layer": "frontend",
-   "title": "無 SDL2 的 GUI 前端",
-   "body": "定案用 winit／wgpu／egui。尚未建立。",
-   "acceptance": "可冷開機到 KGB 標題並用鍵鼠操作。",
+   "id": "intro-translation",
+   "layer": "kgb",
+   "title": "開場字幕譯文",
+   "body": "開場 80M 步攔到 6 句（docs/spec/004）。text/ 尚無譯文表。",
+   "acceptance": "text/kgb.zh-TW.tsv 涵蓋開場全部句子，覆繪顯示中文且字型無缺字。",
    "verify": {
     "kind": "absent",
     "paths": [
-     "crates"
+     "text"
     ],
-    "pattern": "winit",
-    "note": "GUI crate 出現即視為已建立"
+    "pattern": "Maksim Mikhailovich Rukov",
+    "note": "譯文表出現第一句即視為已開始"
+   }
+  },
+  {
+   "id": "overlay-lifecycle",
+   "layer": "kgb",
+   "title": "覆繪項目何時消失",
+   "body": "docs/spec/004 §5 為 DRAFT：目前保留到同呼叫點下一次事件。字幕結束後最後一句會殘留。",
+   "acceptance": "量出原版清除字幕的方式並寫成 READY 契約。",
+   "verify": {
+    "kind": "present",
+    "paths": [
+     "docs/spec/004-kgb-text-takeover.md"
+    ],
+    "pattern": "## 5. 覆繪生命週期（DRAFT）",
+    "note": "改成 READY 時標題會變"
+   }
+  },
+  {
+   "id": "ida-text-routines",
+   "layer": "kgb",
+   "title": "以 IDA 交叉驗證文字 routine",
+   "body": "86e9、87d8、2c40、驅動 51e0:12d1 目前以 objdump 讀記憶體傾印取證。",
+   "acceptance": "IDA 資料庫由已記錄雜湊的傾印建立，逐項確認 docs/spec/004 §2。",
+   "verify": {
+    "kind": "manual",
+    "note": "完成後改綁 docs/re 的 IDA 收據"
+   }
+  },
+  {
+   "id": "dep-ferrogolem",
+   "layer": "kgb",
+   "title": "本庫改依賴 FerroGolem",
+   "body": "核心已搬到 ~/cht/ferrogolem。本庫應刪除 crates/dosgolem-core 與 dgrs-probe，改以路徑依賴 ferrogolem-core。",
+   "acceptance": "kgb-cht 以 ferrogolem-core 建置並重跑開場事件相同。",
+   "verify": {
+    "kind": "absent",
+    "paths": [
+     "crates/kgb-cht/Cargo.toml"
+    ],
+    "pattern": "ferrogolem-core",
+    "note": "改依賴後即成立"
    }
   }
  ]

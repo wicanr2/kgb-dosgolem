@@ -1,6 +1,6 @@
-# dosgolem-rs 工作契約（首個目標：KGB 中文化）
+# dosgolem-rs 工作契約（KGB 中文化）
 
-本專案建立自有的 Rust DOS 執行器 dosgolem-rs，授權 RRSAL-1.0。第一個目標是讓 Cryo《KGB》CD 版（光碟卷名 `CONSPIRACY`）在自有核心上正常執行，再以執行期覆繪做繁體中文化。只做中文化：不做 remake，不做 matching decompilation，不改遊戲規則。
+本專案以執行期覆繪把 Cryo《KGB》CD 版（光碟卷名 `CONSPIRACY`）繁體中文化，授權 RRSAL-1.0。模擬器是另一個 repo FerroGolem（`~/cht/ferrogolem`），本庫只放 KGB 的取證、文字接手、譯文與覆繪。只做中文化：不做 remake，不做 matching decompilation，不改遊戲規則。
 
 本檔是代理與協作者的常駐規則。現況看 `CONTEXT.md`，歷程與勘誤看 `WORKLOG.md`。面向使用者的文件、註解與 commit message 用繁體中文。
 
@@ -9,20 +9,21 @@
 ```sh
 tools/rust.sh fetch                  # 產生 Cargo.lock 並抓依賴，唯一開網路的一步
 tools/rust.sh build                  # 離線 release 建置，產物在 workplace/target/release/
-tools/rust.sh test [-p dosgolem-core] [測試名]   # 離線測試；單一測試照 cargo test 傳名稱
-tools/rust.sh probe <輸出名> <步數>   # 自有核心跑 KGB 啟動器，輸出 workplace/runs/<輸出名>/out/
+tools/rust.sh test [測試名]          # 離線測試；單一測試照 cargo test 傳名稱
+tools/rust.sh kgb <輸出名> <步數> [--shots N]   # 接手文字 routine 跑 KGB，輸出 events.tsv 與 3 倍中文覆繪截圖
 ```
 
 - 光碟解包：`tools/extract_disc.py`，指令見 `docs/re/001-disc-inventory.md`。
 - 未完成項：`python3 -I tools/worklist.py verify /project`（容器內，專案唯讀掛在 `/project`），`selftest` 驗檢查器本身。
-- Go 基準：`workplace/bin/dosgolem-probe-f79eab6`，建置與參數見 `docs/re/002-boot-gap-ledger.md`。
+- 通用探針（傾印、讀取監看、截圖）用 FerroGolem 的 `tools/rust.sh probe`。
+- `tools/rust.sh` 需要 `~/cht/ferrogolem`（`FG_ROOT` 可覆寫），唯讀掛在容器的 `/ferrogolem`。
 
-結構：`crates/dosgolem-core` 是通用核心（CPU、MZ、DOS／BIOS、VGA、PIT），`crates/dgrs-probe` 是不認識遊戲的研究探針。KGB 適配層與 GUI 尚未建立。
+結構：`crates/kgb-cht` 是 KGB 適配層（`takeover` 攔截文字 routine、`catalog` 譯文表、`overlay` 3 倍覆繪、`kgb-run` 無頭執行），依賴 FerroGolem 的 `ferrogolem-core`。GUI 尚未建立。
 
 ## 1. 使用者定案（2026-10-29）
 
-- 執行器：建立自有 Rust 核心，RRSAL-1.0。先讓 KGB 能跑，之後以此為 base 整合相關 repo（`~/cht/dosgolem-rust`、`dosgolem-rust-san5`、`dosgolem-rust-sc`、`dosgolem-rust-xaika` 等）。整合是後續工作，每個 repo 動手前另問。
-- 核心種子：`~/cht/dosgolem-rust-xaika` 的 `src/native`（RRSAL，移植自 Go dosgolem `f79eab6`）。只取已 commit 的版本（`git archive`），不取該庫未提交的工作樹；俠客英雄傳專屬部分不帶入通用層。缺的服務依 Go dosgolem 補。
+- 模擬器（2026-10-29 改定）：另開 repo FerroGolem，clean-room、RRSAL，以 MVP 方式先讓 KGB 可玩，比照 dosgolem-rust-san5。核心已從本庫搬過去，契約見 `~/cht/ferrogolem/AGENTS.md`。本庫依賴它，不再放核心程式。
+- 對拍基準：`~/cht/dosgolem-rust` 分支 `kgb-oracle`（rust-dos）。不再執行 Go dosgolem。
 - 儲存庫：本機目錄 `~/cht/kgb`，私人 GitHub `wicanr2/dosgolem-rs`。使用者已授權建立。
 - 翻譯來源：英文為主，法文對照。Cryo 是法國開發商，法文當語意交叉參照。A 與 U 兩組英文章節檔先查證差異再擇一當比對鍵。
 - 中文化範圍：遊戲內文字與介面、影片字幕（`INTRO.BGF`、`HELP.BGF`）、發行打包。
@@ -33,8 +34,8 @@ tools/rust.sh probe <輸出名> <步數>   # 自有核心跑 KGB 啟動器，輸
 ## 2. 授權與權利邊界
 
 - 自有程式與文件採 RRSAL-1.0，全文範本在 `~/.claude/knowledge-base/retro/rrsal-1.0.md`。選授權的規則見 `~/.claude/rulebook/85-retro-remake-licensing.md`，已定案，不重問。
-- 移植來源保留署名、固定 commit 與授權全文：Go dosgolem（`~/cht/dosgolem`，RRSAL）、xaika 自有核心（RRSAL）。
-- rust-dos（GPL-2.0-or-later）只當外部行為對照。不複製、不翻寫、不連結其程式碼，也不取 `dosgolem-rust`、`dosgolem-rust-san5` 中 rust-dos 衍生的部分。
+- 核心的移植來源與署名在 FerroGolem 的 `external/`。
+- rust-dos（GPL-2.0-or-later）只當外部行為對照。不複製、不翻寫、不連結其程式碼。
 - 原版 zip、ISO、解出的檔案、EXE、存檔、影片、音訊、字型、截圖、RAM 快照一律不進 Git。推送前用 `git ls-files` 複查。
 - 不可散布的字型（倚天，`~/cht/etan_font`）只用於本機。發行版用可散布字型。
 - 本專案與 Cryo Interactive、Virgin Games 及其權利繼承者沒有隸屬或授權關係。
@@ -64,17 +65,15 @@ tools/rust.sh probe <輸出名> <步數>   # 自有核心跑 KGB 啟動器，輸
 前端（winit／wgpu／egui，無 SDL2）：鍵鼠、合成畫面、音訊、前端保留鍵
   │ 輸入                        ▲ 原版畫格＋中文覆繪
   ▼                             │
-通用核心 crate：CPU、MZ 載入、DOS／BIOS／EMS／VGA／音效／CD-ROM 服務；
+FerroGolem（另一 repo）：CPU、MZ 載入、DOS／BIOS／EMS／VGA／音效／CD-ROM 服務；
   單一狀態擁有者，唯讀回報印字、畫格、音訊事件
   │ 唯讀觀察
   ▼
-KGB 適配層：辨識印字與影片事件 → 以原文查 text/*.zh-TW.tsv → 覆繪層
+KGB 適配層（本庫 crates/kgb-cht）：攔截文字 routine → 以原文查 text/*.zh-TW.tsv → 3 倍覆繪層
 ```
 
-- 通用層不含 KGB 位址、檔名或流程。遊戲專屬的攔截點、位址與格式只放 KGB 適配層。日後其他遊戲整合進來，也各自一個適配層。
-- 未知指令、中斷或服務回報 CS:IP 與 opcode 後停止。不猜補，不以空回傳繞過。
-- GUI 事件迴圈留在平台要求的執行緒。模擬狀態只有一個擁有者，以完成的畫格交接，不淺複製可變 RAM 給其他執行緒。
-- 原版記憶體與畫面緩衝不寫入。中文只畫在覆繪層。
+- FerroGolem 不含 KGB 位址、檔名或流程。遊戲專屬的攔截點、位址與格式只放本庫。核心缺的能力到 FerroGolem 補，不在本庫打補丁。
+- 原版記憶體與畫面緩衝不寫入。中文只畫在覆繪層；被接手的 routine 以模擬返回跳過（docs/spec/004）。
 
 ## 5. 中文化規則
 
@@ -100,14 +99,14 @@ KGB 適配層：辨識印字與影片事件 → 以原文查 text/*.zh-TW.tsv �
 - 規則要能指回原版位元組：簽章在映像內恰好出現一次，落點等於段基底加段內位址。
 - 核心的完成宣稱分開記帳：CPU 語料對拍、單一服務測試、KGB 正常玩家路徑。只驗過某指令或某段路徑，不宣稱整個核心正確或遊戲可玩。
 - KGB 能跑的驗收依序分開：啟動器到標題、開新局、正常操作與場景切換、存檔、讀檔、影片播放、音訊。快照與單一畫面不能代替正常路徑。
-- 「已中文化」只限被同狀態收據覆蓋的路徑：同一狀態與輸入下，原版記憶體、indexed 畫面與色盤雜湊不變，像素差異只落在批准的覆繪格。
+- 「已中文化」只限被收據覆蓋的路徑：同一狀態與輸入下，文字事件（原文、呼叫點、座標）與未接手時相同，覆繪顯示對應譯文，字型無缺字。原版英文已跳過，不比像素（§1 文字接手）。
 - 連續兩輪同類失敗，回頭讀原版證據，不調參數重試。
 - 未完成項的權威是 `docs/worklist.json`，每條綁一個 verify。建立或修改 GitHub Issue 前先問使用者。
 
 ## 7. 原版執行與對拍
 
-- 對拍基準優先用 Go dosgolem（`~/cht/dosgolem/CLAUDE.md` 與 `README.md`）。KGB 需要的 EMS、VGA 模式、音效卡、CD-ROM（MSCDEX 磁碟機 `D:`）是否已被 Go dosgolem 涵蓋尚未量測，不假設已支援。
-- 平台行為缺口依 `~/cht/DOSBox-X-MCP-Debugger/dosbox-src/` 與公開規格補進本庫核心，不改回去跑 DOSBox。修改 Go dosgolem 或其他 repo 前先問使用者。
+- 對拍基準是 `~/cht/dosgolem-rust` 分支 `kgb-oracle`（worktree `~/workspace/dosgolem-rust-kgb`）。不再執行 Go dosgolem（使用者 2026-10-29 指示）；`docs/re/002` 裡的 Go 紀錄保留為歷史證據。
+- 平台行為缺口補進 FerroGolem，不改回去跑 DOSBox。修改 FerroGolem 與 `kgb-oracle` 以外的 repo 前先問使用者。
 - 暫用 DOSBox-X 取證時，收據標明基準不同，使用固定 `cycles` 與 `core=normal`。
 - CPU 語料在 `~/cht/dosgolem/testdata/8088/`（唯讀），使用前確認內容存在。語料與原版都不進 Git。
 
@@ -116,7 +115,6 @@ KGB 適配層：辨識印字與影片事件 → 以原文查 text/*.zh-TW.tsv �
 - `README.md` 放用途、入口與現況摘要。`CONTEXT.md` 放目前真相與術語。`WORKLOG.md` 按時間追加歷程與勘誤。正文只寫現況，推翻紀錄集中到 `WORKLOG.md`。
 - `docs/spec/` 放規格，`docs/re/` 放證據，索引是 `docs/re/README.md`。新增文件同次登記到 README 或相應索引。
 - `text/` 放譯文 catalog、術語表、譯名表。不放原版全文、手冊掃描或可還原原作的大量文字。`font/` 放字元清單與重建說明，不提交字型二進位。
-- `external/` 放移植來源的署名、固定 commit 與授權全文。
 - `workplace/` 是唯一可寫的研究工作區，整個 `.gitignore`。解出的原版檔、反組譯資料庫、探針輸出與截圖都在這裡。
 - 寫對外文件先讀 `~/.claude/rulebook/90-plain-language.md` 與 `91-deslop-ai-writing.md`。README 依 `~/.claude/rulebook/80-retro-cht-readme-polish.md`。
 
@@ -129,7 +127,7 @@ KGB 適配層：辨識印字與影片事件 → 以原文查 text/*.zh-TW.tsv �
 - 禁止 `docker {image,system,volume,builder,container,network} prune` 與 `docker rmi`，不刪別人的容器與映像。容器名前綴 `dgrs-`。
 - git 身分用 repo-local 的 `wicanr2@gmail.com`，另查 `git log --format=%ae | sort -u`。commit message 用繁體中文，結尾保留 `Co-Authored-By`，不放 session 連結。
 - 每次 push 先回報再確認，除非使用者另行授權逐批推送。推送前掃描 staged 檔案，確認沒有原版檔、受限副檔名與手冊內容。
-- 不修改其他 repo、`~/.claude/`、`~/.cache/`。種子與對照來源一律唯讀讀取。
+- 可寫的其他 repo 只有 FerroGolem 與 `kgb-oracle` worktree（使用者授權）。不修改其他 repo、`~/.claude/`、`~/.cache/`。
 
 ## 10. 子代理
 

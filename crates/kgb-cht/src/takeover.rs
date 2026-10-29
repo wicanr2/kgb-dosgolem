@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-RRSAL-1.0
 //! 文字 routine 接手。偏移為 CSPPRG.EXE 解壓後 load segment 內的位置，
 //! 每次攔截前比對 16 bytes 簽章（docs/spec/004 §2、§3）。
-use dosgolem_core::cpu::{AX, BP, BX, CS, CX, Cpu, DI, DS, DX, ZF};
-use dosgolem_core::machine::Machine;
+use ferrogolem_core::cpu::{AX, BP, BX, CS, CX, Cpu, DI, DS, DX, ZF};
+use ferrogolem_core::machine::Machine;
 
 pub const BLOCK: u16 = 0x86e9;
 pub const LINE: u16 = 0x87d8;
@@ -72,7 +72,7 @@ impl Takeover {
         if cs != m.psp.wrapping_add(0x10) || (ip != BLOCK && ip != LINE) {
             return None;
         }
-        let ss_sp = (m.cpu.s[dosgolem_core::cpu::SS], m.cpu.r[dosgolem_core::cpu::SP]);
+        let ss_sp = (m.cpu.s[ferrogolem_core::cpu::SS], m.cpu.r[ferrogolem_core::cpu::SP]);
         let site = word(m, ss_sp.0, ss_sp.1);
         let ds = m.cpu.s[DS];
         let (r, step) = (m.cpu.r, m.cpu.steps);

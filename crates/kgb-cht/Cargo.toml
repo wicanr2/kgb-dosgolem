@@ -8,6 +8,6 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
-dosgolem-core = { path = "../dosgolem-core" }
+ferrogolem-core = { path = "../../../ferrogolem/crates/ferrogolem-core" }
 fontdue = "=0.9.5"
 serde_json = "=1.0.151"

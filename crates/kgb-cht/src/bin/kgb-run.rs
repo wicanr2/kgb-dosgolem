@@ -3,8 +3,8 @@
 //!
 //! kgb-run --root <原版唯讀> --scratch <暫存層> --out <尚不存在的目錄>
 //!         [--steps N] [--shots N] [--tsv <譯文表>]... [--font <ttc> --font-index N]
-use dosgolem_core::machine::Machine;
-use dosgolem_core::png::encode_rgb;
+use ferrogolem_core::machine::Machine;
+use ferrogolem_core::png::encode_rgb;
 use kgb_cht::catalog::{Catalog, key_of};
 use kgb_cht::overlay::{self, Glyphs, Item};
 use kgb_cht::takeover::Takeover;

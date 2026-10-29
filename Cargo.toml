@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/dosgolem-core", "crates/dgrs-probe", "crates/kgb-cht"]
+members = ["crates/kgb-cht"]
 
 [workspace.package]
 edition = "2024"
