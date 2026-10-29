@@ -6,6 +6,7 @@
 use ferrogolem_core::machine::Machine;
 use ferrogolem_core::png::encode_rgb;
 use kgb_cht::catalog::{Catalog, key_of};
+use kgb_cht::lifecycle::Screen;
 use kgb_cht::overlay::{self, Glyphs, Item};
 use kgb_cht::takeover::Takeover;
 use serde_json::json;
@@ -82,7 +83,9 @@ fn run(a: Args) -> Result<bool, String> {
     let mut m = Machine::with_scratch(&a.root, &a.scratch)?;
     m.load_with_tail("CSPPRG.EXE", TAIL.as_bytes())?;
     let mut take = Takeover::default();
-    let mut items: Vec<Item> = Vec::new();
+    let mut screen = Screen::default();
+    // 生命週期依 mode 13h 畫面寫入判斷（docs/spec/004 §5）。
+    m.bus.write_watch = Some((0xa0000, 0xaf9ff));
     let mut log = String::from("step\tkind\tsite\tx\ty\tlines\tlh\tcolor\ttranslated\tkey\n");
     let (mut events, mut translated) = (0u64, 0u64);
     let mut error = None;
@@ -100,9 +103,8 @@ fn run(a: Args) -> Result<bool, String> {
             );
             // 未譯的句子以英文原文畫在覆繪層，不讓文字消失。
             let shown = zh.map_or_else(|| String::from_utf8_lossy(&e.text).replace('^', "\n"), str::to_string);
-            items.retain(|it| it.event.site != e.site || it.event.kind != e.kind);
             if !e.text.is_empty() {
-                items.push(Item { event: e, zh: shown });
+                screen.on_event(Item { event: e, zh: shown });
             }
             continue;
         }
@@ -110,12 +112,16 @@ fn run(a: Args) -> Result<bool, String> {
             error = Some(e);
             break;
         }
+        if !m.bus.write_hits.is_empty() {
+            screen.on_writes(m.cpu.steps, &m.bus.write_hits);
+            m.bus.write_hits.clear();
+        }
         if a.shots > 0 && m.cpu.steps >= next_shot {
             next_shot += a.shots;
             let (w, h, rgb) = m.bus.rgb();
             let name = format!("shot-{:010}.png", m.cpu.steps);
             if let (Some(g), 320, 200) = (glyphs.as_mut(), w, h) {
-                let big = overlay::compose(&rgb, &items, &dac8(&m), g);
+                let big = overlay::compose(&rgb, &screen.items(), &dac8(&m), g);
                 fs::write(a.out.join(name), encode_rgb(overlay::W, overlay::H, &big)).map_err(|e| e.to_string())?;
             } else {
                 fs::write(a.out.join(name), encode_rgb(w, h, &rgb)).map_err(|e| e.to_string())?;
@@ -126,7 +132,8 @@ fn run(a: Args) -> Result<bool, String> {
     let report = json!({
         "executed": m.cpu.steps, "error": error, "at": format!("{:04x}:{:04x}", m.cpu.start.0, m.cpu.start.1),
         "events": events, "translated": translated, "catalog": catalog.len(),
-        "dac_of_items": items.iter().map(|it| format!("{}={:?}", it.event.color, m.bus.vga.dac[usize::from(it.event.color)])).collect::<Vec<_>>(),
+        "overlay_removed": screen.removed,
+        "dac_of_items": screen.items().iter().map(|it| format!("{}={:?}", it.event.color, m.bus.vga.dac[usize::from(it.event.color)])).collect::<Vec<_>>(),
         "signature_mismatches": take.mismatches.iter().map(|(o, n)| format!("{o:04x}×{n}")).collect::<Vec<_>>(),
     });
     fs::write(a.out.join("report.json"), serde_json::to_string_pretty(&report).unwrap()).map_err(|e| e.to_string())?;

@@ -6,8 +6,8 @@
 
 - 原版光碟已解到 `workplace/disc/`（docs/re/001）。
 - 模擬器在 FerroGolem（`~/cht/ferrogolem`）。KGB 在 50M 步內跑到 `INTRO.BGF` 開場，沒有停點（docs/re/002）。
-- 文字 routine 已接手（docs/spec/004）：開場 80M 步攔到 6 句字幕，原版英文不畫，覆繪層以 Noto Sans CJK TC 顯示；目前沒有譯文，畫的是英文原文。
-- 覆繪項目的消失時機未量（spec 004 §5 DRAFT）。
+- 文字 routine 已接手（docs/spec/004）：開場兩段共 47 句字幕已有譯文（`text/intro.zh-TW.tsv`，譯名見 `text/glossary-zh-TW.tsv`），第一段 31 句在 334M 步內全部以中文顯示，換場時依原版時機消失。
+- 開場第二段（父親獨白）在 #478M 停在 DSP `D0h`（暫停 8 位元 DMA），FerroGolem 尚未支援。
 - 對拍基準 dosgolem-rust 分支 `kgb-oracle` 已跑出完整開場，6 句字幕與攔到的事件逐字相同（FerroGolem docs/re/001）。開場字卡「Moscow, August 1991...」不經文字 routine，推測是語系圖檔（worklist `image-localization`）。
 - 未完成項見 `docs/worklist.json`，以 `tools/worklist.py verify` 檢查。
 

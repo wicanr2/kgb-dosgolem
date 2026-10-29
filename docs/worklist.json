@@ -34,36 +34,6 @@
    }
   },
   {
-   "id": "intro-translation",
-   "layer": "kgb",
-   "title": "開場字幕譯文",
-   "body": "開場 80M 步攔到 6 句（docs/spec/004）。text/ 尚無譯文表。",
-   "acceptance": "text/kgb.zh-TW.tsv 涵蓋開場全部句子，覆繪顯示中文且字型無缺字。",
-   "verify": {
-    "kind": "absent",
-    "paths": [
-     "text"
-    ],
-    "pattern": "Maksim Mikhailovich Rukov",
-    "note": "譯文表出現第一句即視為已開始"
-   }
-  },
-  {
-   "id": "overlay-lifecycle",
-   "layer": "kgb",
-   "title": "覆繪項目何時消失",
-   "body": "docs/spec/004 §5 為 DRAFT：目前保留到同呼叫點下一次事件。字幕結束後最後一句會殘留。",
-   "acceptance": "量出原版清除字幕的方式並寫成 READY 契約。",
-   "verify": {
-    "kind": "present",
-    "paths": [
-     "docs/spec/004-kgb-text-takeover.md"
-    ],
-    "pattern": "## 5. 覆繪生命週期（DRAFT）",
-    "note": "改成 READY 時標題會變"
-   }
-  },
-  {
    "id": "ida-text-routines",
    "layer": "kgb",
    "title": "以 IDA 交叉驗證文字 routine",
@@ -78,7 +48,7 @@
    "id": "image-localization",
    "layer": "kgb",
    "title": "語系圖片中文化（字卡等）",
-   "body": "開場字卡「Moscow, August 1991...」不經文字 routine，推測為 TCD1A.SCR（另有 D、F、S 版）。TCD2*、TH*.SQX 也可能是語系圖片。",
+   "body": "開場字卡「Moscow, August 1991...」不經文字 routine，推測為 TCD1A.SCR（另有 D、F、S 版）。TCD2*、TH*.SQX 也可能是語系圖片。第一段結束時另有字卡「Some days before...」。",
    "acceptance": "取證 SCR 格式與顯示路徑，定出圖片覆繪或替換方式的規格。",
    "verify": {
     "kind": "manual",

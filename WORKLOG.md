@@ -20,3 +20,6 @@
 - 使用者指示不再跑 Go dosgolem 當基準，改用 `~/cht/dosgolem-rust`（分支 `kgb-oracle`，worktree `~/workspace/dosgolem-rust-kgb`）。go-r4 的結果未採用。
 - 使用者決定另開新 repo FerroGolem：clean-room、RRSAL 的 Rust DOS 模擬器，以 MVP 方式先讓 KGB 能跑；本庫留作 KGB 中文化並依賴它。
 - kgb-oracle 跑出開場：6 句字幕與攔到的事件相同；字卡是圖片，新增 worklist `image-localization`。
+- 收集開場兩段共 47 句（kgb-r6），寫譯名表與 `text/intro.zh-TW.tsv`；譯文顯示正常（kgb-r7）。
+- 量字幕生命週期：`51e0:0bcd` 每句搬一次字幕帶，換場時 `0c05` 整格重繪才蓋掉；`lifecycle.rs` 依此實作，spec 004 §5 改 READY（kgb-r8）。
+- 開場第二段停在 DSP D0h，記為 FerroGolem 缺口。
