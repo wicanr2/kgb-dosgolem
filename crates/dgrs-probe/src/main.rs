@@ -4,7 +4,7 @@
 //! 不認識任何特定遊戲。
 //!
 //! dgrs-probe --root <DOS 根目錄> --exe <程式> [--tail <命令列尾>]
-//!            [--steps N] --out <尚不存在的輸出目錄>
+//!            [--scratch <可寫暫存層>] [--steps N] --out <尚不存在的輸出目錄>
 use dosgolem_core::{
     cpu::{AX, BP, BX, CS, CX, DI, DS, DX, ES, SI, SP, SS},
     machine::Machine,
@@ -16,12 +16,14 @@ struct Args {
     root: PathBuf,
     exe: String,
     tail: String,
+    scratch: Option<PathBuf>,
     steps: u64,
     out: PathBuf,
 }
 
 fn parse() -> Result<Args, String> {
     let mut it = std::env::args().skip(1);
+    let mut scratch = None;
     let (mut root, mut exe, mut tail, mut steps, mut out) = (None, None, String::new(), 2_000_000, None);
     while let Some(k) = it.next() {
         let mut v = || it.next().ok_or(format!("{k} 需要值"));
@@ -29,6 +31,7 @@ fn parse() -> Result<Args, String> {
             "--root" => root = Some(PathBuf::from(v()?)),
             "--exe" => exe = Some(v()?),
             "--tail" => tail = v()?,
+            "--scratch" => scratch = Some(PathBuf::from(v()?)),
             "--steps" => steps = v()?.parse().map_err(|e| format!("--steps：{e}"))?,
             "--out" => out = Some(PathBuf::from(v()?)),
             _ => return Err(format!("未知參數 {k}")),
@@ -38,6 +41,7 @@ fn parse() -> Result<Args, String> {
         root: root.ok_or("缺 --root")?,
         exe: exe.ok_or("缺 --exe")?,
         tail,
+        scratch,
         steps,
         out: out.ok_or("缺 --out")?,
     })
@@ -93,7 +97,10 @@ fn png(w: usize, h: usize, rgb: &[u8]) -> Vec<u8> {
 
 fn run(a: Args) -> Result<bool, String> {
     fs::create_dir(&a.out).map_err(|e| format!("建立 {}：{e}", a.out.display()))?;
-    let mut m = Machine::new(&a.root)?;
+    let mut m = match &a.scratch {
+        Some(s) => Machine::with_scratch(&a.root, s)?,
+        None => Machine::new(&a.root)?,
+    };
     m.load_with_tail(&a.exe, a.tail.as_bytes())?;
     let mut error = None;
     while m.cpu.steps < a.steps && !m.exited {

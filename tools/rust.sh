@@ -7,7 +7,7 @@
 #   tools/rust.sh test             離線跑測試
 #   tools/rust.sh cargo <參數...>  離線執行任意 cargo 子命令（專案唯讀）
 #   tools/rust.sh probe <輸出名> <步數>
-#                                  以 workplace/disc 為來源建立可寫 DOS 根目錄，
+#                                  原版 workplace/disc/cd 唯讀共用，每次執行只建可寫暫存層，
 #                                  在自有核心上跑 KGB 啟動器，輸出到 workplace/runs/<輸出名>
 #
 # 映像預設為共用基底 dosgolem-rust-sc:1.99.1-r1（不修改它），可用 DGRS_RUST_IMAGE 覆寫。
@@ -50,15 +50,14 @@ case "$cmd" in
     test -x "$WP/target/release/dgrs-probe" || { echo "先跑 tools/rust.sh build" >&2; exit 1; }
     run="$WP/runs/$name"
     test ! -e "$run" || { echo "$run 已存在，換一個輸出名" >&2; exit 1; }
-    mkdir -p "$run/root/KGB"
-    # 可寫副本：原版 workplace/disc 不被寫入。CONSP.BAT 指定寫入路徑 C:\KGB\。
-    cp --reflink=auto "$WP/disc/cd/"* "$run/root/"
-    cp "$WP/disc/CSP.CFG" "$run/root/KGB/"
+    # 原版共用一份並唯讀掛載；每次執行只有暫存層可寫。CONSP.BAT 指定寫入路徑 C:\KGB\。
+    mkdir -p "$run/scratch/KGB"
+    cp "$WP/disc/CSP.CFG" "$run/scratch/KGB/"
     timeout 1800 docker run --rm -u "$(id -u):$(id -g)" --name "dgrs-probe-$name" \
       --memory 2g --cpus 1 --pids-limit 64 --network none \
       --log-opt max-size=10m --log-opt max-file=3 \
-      -v "$WP/target/release:/tool:ro" -v "$run:/run" "$IMAGE" \
-      /tool/dgrs-probe --root /run/root --exe CSPPRG.EXE \
+      -v "$WP/target/release:/tool:ro" -v "$WP/disc/cd:/game:ro" -v "$run:/run" "$IMAGE" \
+      /tool/dgrs-probe --root /game --scratch /run/scratch --exe CSPPRG.EXE \
       --tail ' AMR ADP220 SBP2227 EMS 386 SAF WRIC:\KGB\' \
       --steps "$steps" --out /run/out
     ;;

@@ -34,6 +34,7 @@ pub struct Machine {
     pub cpu: Cpu,
     pub bus: Memory,
     pub root: PathBuf,
+    pub scratch: Option<PathBuf>,
     pub program: String,
     pub psp: u16,
     pub started: u64,
@@ -59,6 +60,16 @@ pub struct Machine {
     search: VecDeque<PathBuf>,
 }
 impl Machine {
+    /// 唯讀根目錄加可寫暫存層：所有寫入、建立與刪除只落在暫存層。
+    pub fn with_scratch(root: &Path, scratch: &Path) -> Result<Self, String> {
+        let scratch = scratch.canonicalize().map_err(|e| e.to_string())?;
+        if !scratch.is_dir() {
+            return Err("DOS scratch must be a directory".into());
+        }
+        let mut m = Self::new(root)?;
+        m.scratch = Some(scratch);
+        Ok(m)
+    }
     pub fn new(root: &Path) -> Result<Self, String> {
         let root = root.canonicalize().map_err(|e| e.to_string())?;
         if !root.is_dir() {
@@ -68,6 +79,7 @@ impl Machine {
             cpu: Cpu::default(),
             bus: Memory::default(),
             root,
+            scratch: None,
             program: String::new(),
             psp: 0x187b,
             started: 0,
@@ -143,20 +155,50 @@ impl Machine {
         self.bus.ram[base + 0x81 + tail.len()] = 13;
         Ok(())
     }
+    /// 讀取路徑：先找暫存層，再找唯讀根目錄。create 為真時沒有暫存層才落在根目錄（種子行為）。
     fn resolve(&self, name: &str, create: bool) -> Result<PathBuf, String> {
+        if let Some(scratch) = &self.scratch {
+            if let Ok(p) = Self::resolve_in(scratch, name, false) {
+                return Ok(p);
+            }
+            if create {
+                return self.resolve_write(name, true);
+            }
+        }
+        Self::resolve_in(&self.root, name, create)
+    }
+    /// 寫入路徑。有暫存層時一律落在暫存層；開既有檔來寫時先把根目錄的原檔複製進來（寫入時複製）。
+    fn resolve_write(&self, name: &str, create: bool) -> Result<PathBuf, String> {
+        let Some(scratch) = &self.scratch else {
+            return Self::resolve_in(&self.root, name, create);
+        };
+        let target = Self::resolve_in(scratch, name, true)?;
+        if !target.exists() {
+            if let Some(parent) = target.parent() {
+                fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            if !create {
+                let source = Self::resolve_in(&self.root, name, false)?;
+                fs::copy(source, &target).map_err(|e| e.to_string())?;
+            }
+        }
+        Ok(target)
+    }
+    pub(crate) fn resolve_in(base: &Path, name: &str, create: bool) -> Result<PathBuf, String> {
         let normalized = name.replace('\\', "/");
         let normalized = if normalized.as_bytes().get(1) == Some(&b':') {
             &normalized[2..]
         } else {
             &normalized
         };
-        let mut path = self.root.clone();
+        let mut path = base.to_path_buf();
         for component in Path::new(normalized.trim_start_matches('/')).components() {
             match component {
                 Component::Normal(part) => {
                     let text = part.to_string_lossy();
                     let found = fs::read_dir(&path)
-                        .map_err(|e| e.to_string())?
+                        .into_iter()
+                        .flatten()
                         .filter_map(Result::ok)
                         .find(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case(&text))
                         .map(|e| e.path());

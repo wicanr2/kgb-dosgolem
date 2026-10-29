@@ -146,7 +146,11 @@ impl Machine {
                 if self.file_log.len() < 4096 {
                     self.file_log.push(FileEvent { step: self.cpu.steps, ah, name: name.clone(), result: -1 });
                 }
-                let path = self.resolve(&name, ah == 0x3c);
+                let path = if ah == 0x3d && al & 3 != 0 {
+                    self.resolve_write(&name, false)
+                } else {
+                    self.resolve(&name, ah == 0x3c)
+                };
                 if let Ok(path) = path {
                     let mut options = OpenOptions::new();
                     options.read(true);
@@ -239,9 +243,14 @@ impl Machine {
             }
             0x41 => {
                 let name = self.cstring(ds, dx)?;
-                let result = self
-                    .resolve(&name, false)
-                    .and_then(|p| fs::remove_file(p).map_err(|e| e.to_string()));
+                let path = self.resolve(&name, false);
+                // 有暫存層時，根目錄有原版檔就不可刪（回 05h 拒絕存取），暫存層的副本也保留；
+                // 否則刪掉副本會讓原版重新露出來。
+                if self.scratch.is_some() && Self::resolve_in(&self.root, &name, false).is_ok() {
+                    self.fail(5);
+                    return Ok(());
+                }
+                let result = path.and_then(|p| fs::remove_file(p).map_err(|e| e.to_string()));
                 if result.is_err() {
                     self.fail(2);
                     return Ok(());
@@ -411,9 +420,15 @@ impl Machine {
             0x4e => {
                 let name = self.cstring(ds, dx)?;
                 let pattern = name.to_ascii_uppercase();
-                let mut found = Vec::new();
-                for e in fs::read_dir(&self.root).map_err(|e| e.to_string())? {
+                let mut found: Vec<PathBuf> = Vec::new();
+                let mut dirs = vec![self.root.clone()];
+                dirs.extend(self.scratch.clone());
+                for e in dirs.iter().rev().flat_map(|d| fs::read_dir(d).into_iter().flatten()) {
                     let p = e.map_err(|e| e.to_string())?.path();
+                    let upper = p.file_name().unwrap().to_string_lossy().to_ascii_uppercase();
+                    if found.iter().any(|f| f.file_name().unwrap().to_string_lossy().to_ascii_uppercase() == upper) {
+                        continue;
+                    }
                     if p.is_file()
                         && wildcard(
                             pattern.as_bytes(),
@@ -427,7 +442,7 @@ impl Machine {
                         found.push(p)
                     }
                 }
-                found.sort();
+                found.sort_by_key(|p| p.file_name().unwrap().to_ascii_uppercase());
                 self.search = found.into();
                 if !self.find_next()? {
                     self.fail(18);
