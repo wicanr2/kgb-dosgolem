@@ -53,8 +53,19 @@ pub struct TextEvent {
     pub block: (u16, u16),
     /// 區塊：未正規化的整塊位元組 `[8, e)`；單行同 `text`。組合多片語譯文用。
     pub raw: Vec<u8>,
-    /// 區塊內各片語的起點索引（由 Session 依 `53d8` 紀錄填入，docs/spec/004 §7）。
-    pub segments: Vec<u16>,
+    /// 區塊內由 `53d8`（片語）與 `56d5`（插槽）寫入的範圍，由 Session 填入（docs/spec/004 §7、§8）。
+    pub segments: Vec<Segment>,
+}
+
+/// 區塊內一段由片語解碼器或插槽寫入的範圍 `[start, end)`（區塊索引）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Segment {
+    pub start: u16,
+    pub end: u16,
+    /// 巢狀深度：最外層片語為 0，其插槽為 1，插槽內遞迴的片語為 2，依此類推。
+    pub depth: u8,
+    /// 插槽字碼（`56d5` 的 AL）；片語為 None。
+    pub slot: Option<u8>,
 }
 
 /// 區塊資料的起點（`[DI+2]` 重設為 8：`2c40`、`7650`、`72cd`）。

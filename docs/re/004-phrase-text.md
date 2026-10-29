@@ -28,4 +28,5 @@
 - 4,000 項全部成功，3,999 個非空片語，共 161,193 字元（`workplace/runs/extract-1/phrases.tsv`，原版文字不進 Git）。
 - 執行期 `584f` 旁白的比對鍵（docs/spec/004 §4 正規化後）與第 460 號片語逐字相同。已證實。
 - 片語中有 `#` 字元（例：`Kruglov# No, the numbers are wrong# ...`），用途未知。
-- 執行期的文字區塊可能由多個片語與物件名稱組成；單一片語區塊可直接以片語譯文對上，組合區塊另立規格。
+- 執行期的文字區塊可能由多個片語與物件名稱組成；單一片語區塊可直接以片語譯文對上，組合規則見 docs/spec/004 §7、§8。
+- 插槽（`workplace/runs/extract-2`，同一萃取另記 `56d5` 的範圍與字碼）：40 個片語含插槽，字碼只有 FAh、FCh、FEh；萃取時 FAh 插槽為空，FCh、FEh 插槽為空且後接預設代名詞「him」。片語原文與 extract-1 逐字相同。範本譯文表由 `tools/make_templates.py` 產生（`text/chapter1-templates.zh-TW.tsv`）。

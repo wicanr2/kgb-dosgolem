@@ -6,6 +6,10 @@
 //! FFFFh 讓遊戲不插入排版斷行，執行到返回哨兵後讀出區塊內容。這是離線萃取用的拋棄式機器，
 //! 會改寫區塊 4434 與解碼器的狀態變數，不用於遊玩。
 //!
+//! 插槽（docs/spec/004 §8）：解碼器遇到 1FFAh 以上的字碼時呼叫 `56d5`，以目前物件的名稱或
+//! 預設代名詞填入。萃取時記下每次 `56d5` 寫入的範圍與字碼（AL），另輸出 `template` 欄：
+//! 把插槽內容換成 `{字碼}`（兩位十六進位）。沒有插槽的片語該欄為空。
+//!
 //! kgb-extract --root <原版唯讀> --scratch <暫存層> --out <輸出 TSV> [--steps N] [--cycles N]
 use ferrogolem_core::cpu::{AX, CS, DI, DS, ES, IF, SP, SS};
 use ferrogolem_core::cpu::Cpu;
@@ -18,6 +22,7 @@ const DATA: u16 = 0x2144 - 0x188b; // 主資料段相對 load segment 的位移
 const DECODE: u16 = 0x53d8;
 const BLOCK: u16 = 0x4434;
 const SENTINEL: u16 = 0xfff0;
+const SLOT: u16 = 0x56d5;
 
 fn word(m: &Machine, seg: u16, off: u16) -> u16 {
     m.bus.word(Cpu::address(seg, off))
@@ -48,7 +53,8 @@ fn main_inner() -> Result<(), String> {
     let data = code + DATA;
     let phz = word(&m, data, 0x06dc);
     let count = word(&m, phz, 0) / 2;
-    let mut tsv = String::from("index\toffset\tstatus\ttext\n");
+    let mut tsv = String::from("index\toffset\tstatus\ttext\ttemplate\n");
+    let mut templates = 0;
     let (mut ok, mut failed) = (0, 0);
     for i in 0..count {
         let off = word(&m, phz, i * 2);
@@ -72,7 +78,22 @@ fn main_inner() -> Result<(), String> {
         m.bus.set_word(Cpu::address(ss, sp), SENTINEL);
         let limit = m.cpu.steps + 2_000_000;
         let mut status = "ok";
+        // (起點索引, 字碼, 返回位址, 進入時 SP)；返回後補上終點。
+        let mut open: Vec<(u16, u8, u16, u16)> = Vec::new();
+        let mut slots: Vec<(u16, u16, u8)> = Vec::new();
         while !(m.cpu.s[CS] == code && m.cpu.ip == SENTINEL) {
+            if m.cpu.s[CS] == code {
+                let sp = m.cpu.r[SP];
+                if m.cpu.ip == SLOT {
+                    let ret = m.bus.word(Cpu::address(m.cpu.s[SS], sp));
+                    open.push((m.bus.word(base + 2), m.cpu.r[AX] as u8, ret, sp));
+                } else if let Some(&(start, code_, ret, at)) = open.last() {
+                    if m.cpu.ip == ret && sp == at.wrapping_add(2) {
+                        open.pop();
+                        slots.push((start, m.bus.word(base + 2), code_));
+                    }
+                }
+            }
             if m.cpu.steps > limit {
                 status = "timeout";
                 break;
@@ -85,12 +106,25 @@ fn main_inner() -> Result<(), String> {
         }
         let end = m.bus.word(base + 2);
         let text: Vec<u8> = (8..end.max(8)).map(|k| m.bus.ram[base + usize::from(k)]).collect();
-        let _ = writeln!(tsv, "{i}\t{off:04x}\t{status}\t{}", key_of(&text));
+        let mut template = String::new();
+        if !slots.is_empty() {
+            templates += 1;
+            let mut at = 8u16;
+            slots.sort();
+            for &(a, z, c) in &slots {
+                let a = a.max(at);
+                template += &key_of(&(at..a).map(|k| m.bus.ram[base + usize::from(k)]).collect::<Vec<u8>>());
+                template += &format!("{{{c:02x}}}");
+                at = z.max(a);
+            }
+            template += &key_of(&(at..end.max(at)).map(|k| m.bus.ram[base + usize::from(k)]).collect::<Vec<u8>>());
+        }
+        let _ = writeln!(tsv, "{i}\t{off:04x}\t{status}\t{}\t{template}", key_of(&text));
         if status == "ok" { ok += 1 } else { failed += 1 }
         m.cpu = saved;
     }
     fs::write(out.ok_or("缺 --out")?, tsv).map_err(|e| e.to_string())?;
-    println!("phrases={count} ok={ok} failed={failed} phz={phz:04x}");
+    println!("phrases={count} ok={ok} failed={failed} templates={templates} phz={phz:04x}");
     Ok(())
 }
 

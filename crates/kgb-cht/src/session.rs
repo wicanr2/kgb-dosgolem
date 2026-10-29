@@ -4,7 +4,7 @@
 use crate::catalog::{Catalog, key_of};
 use crate::lifecycle::Screen;
 use crate::overlay::{self, Glyphs, Item};
-use crate::takeover::{BLOCK_DATA, Takeover, TextEvent, normalize};
+use crate::takeover::{BLOCK_DATA, Segment, Takeover, TextEvent, normalize};
 use std::collections::HashMap;
 use ferrogolem_core::cpu::{AX, CS, Cpu, DI, DS, ES, SP, SS};
 use ferrogolem_core::machine::Machine;
@@ -26,12 +26,25 @@ pub struct Session {
     /// 片語解碼器 `53d8` 的呼叫紀錄（TSV，含表頭），只觀測、不改狀態；`None` 時不記。
     /// 取證多片語區塊用（worklist composite-blocks）。
     pub phrase_log: Option<String>,
-    /// 各區塊（ES, DI）目前的片語起點，依 `53d8` 呼叫記錄（docs/spec/004 §7）。
-    starts: HashMap<(u16, u16), Vec<u16>>,
+    /// 進行中的 `53d8`、`56d5` 呼叫。
+    frames: Vec<Frame>,
+    /// 各區塊（ES, DI）已完成的片語與插槽範圍（docs/spec/004 §7、§8）。
+    segments: HashMap<(u16, u16), Vec<Segment>>,
 }
 
 /// 片語解碼器入口（docs/re/004）：AX＝片語偏移、DS＝PHZ 段、ES:DI＝文字區塊。
 const PHRASE_DECODE: u16 = 0x53d8;
+/// 插槽填入（docs/spec/004 §8）：AL＝字碼，ES:DI＝文字區塊。
+const SLOT_FILL: u16 = 0x56d5;
+
+/// 一次進行中的呼叫：以返回位址與進入時的 SP 判斷何時返回。
+struct Frame {
+    block: (u16, u16),
+    start: u16,
+    ret: u16,
+    sp: u16,
+    slot: Option<u8>,
+}
 
 impl Session {
     /// root 為原版唯讀目錄，scratch 為可寫暫存層（需已含 `KGB\CSP.CFG`）。
@@ -46,44 +59,38 @@ impl Session {
             take: Takeover::default(),
             screen: Screen::default(),
             catalog,
-            log: String::from("step\tkind\tsite\tx\ty\tlines\tlh\tcolor\ttranslated\tkey\ttaken\tpage\n"),
+            log: String::from("step\tkind\tsite\tx\ty\tlines\tlh\tcolor\ttranslated\tkey\ttaken\tpage\tsegments\n"),
             events: 0,
             translated: 0,
             phrase_log: None,
-            starts: HashMap::new(),
+            frames: Vec::new(),
+            segments: HashMap::new(),
         })
     }
 
     /// 執行到步數達 `until` 或程式結束。
     pub fn run_until(&mut self, until: u64) -> Result<(), String> {
         while self.m.cpu.steps < until && !self.m.exited {
-            let c = &self.m.cpu;
-            if c.ip == PHRASE_DECODE && c.s[CS] == self.m.psp.wrapping_add(0x10) {
-                let (es, di) = (c.s[ES], c.r[DI]);
-                let at = |o: u16| self.m.bus.word(Cpu::address(es, di.wrapping_add(o)));
-                let start = at(2);
-                let list = self.starts.entry((es, di)).or_default();
-                if list.last().is_some_and(|&last| start <= last) {
-                    list.clear();
-                }
-                list.push(start);
-                if let Some(log) = &mut self.phrase_log {
-                    let ret = self.m.bus.word(Cpu::address(c.s[SS], c.r[SP]));
-                    let _ = writeln!(log, "{}\t{:04x}\t{:04x}\t{:04x}\t{:04x}\t{}\t{}", c.steps, ret, c.r[AX], c.s[DS], di, start, at(4));
-                }
+            if self.m.cpu.s[CS] == self.m.psp.wrapping_add(0x10) {
+                self.track_segments();
             }
             if let Some(mut e) = self.take.intercept(&mut self.m) {
                 if e.kind == crate::takeover::Kind::Block {
-                    e.segments = self.starts.get(&e.block).cloned().unwrap_or_default();
+                    e.segments = self.segments.get(&e.block).cloned().unwrap_or_default();
                 }
                 let (shown, found) = shown(&self.catalog, &e);
                 self.events += 1;
                 self.translated += u64::from(found);
                 let _ = writeln!(
                     self.log,
-                    "{}\t{:?}\t{:04x}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                    "{}\t{:?}\t{:04x}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
                     e.step, e.kind, e.site, e.x, e.y, e.max_lines, e.line_height, e.color,
-                    u8::from(found), key_of(&e.text), u8::from(e.taken), e.page
+                    u8::from(found), key_of(&e.text), u8::from(e.taken), e.page,
+                    e.segments
+                        .iter()
+                        .map(|g| format!("{}-{}:{}{}", g.start, g.end, g.depth, g.slot.map_or(String::new(), |c| format!(":{c:02x}"))))
+                        .collect::<Vec<_>>()
+                        .join(" ")
                 );
                 let taken = e.taken;
                 if taken && !e.text.is_empty() {
@@ -100,6 +107,42 @@ impl Session {
             }
         }
         Ok(())
+    }
+
+    /// 追蹤 `53d8` 與 `56d5` 的進出（只讀，不改狀態）。CS 已確認是 load segment。
+    fn track_segments(&mut self) {
+        let c = &self.m.cpu;
+        let (ip, sp) = (c.ip, c.r[SP]);
+        if ip == PHRASE_DECODE || ip == SLOT_FILL {
+            let block = (c.s[ES], c.r[DI]);
+            let start = self.m.bus.word(Cpu::address(block.0, block.1.wrapping_add(2)));
+            let ret = self.m.bus.word(Cpu::address(c.s[SS], sp));
+            let slot = (ip == SLOT_FILL).then_some(c.r[AX] as u8);
+            if ip == PHRASE_DECODE {
+                if let Some(log) = &mut self.phrase_log {
+                    let width = self.m.bus.word(Cpu::address(block.0, block.1.wrapping_add(4)));
+                    let _ = writeln!(log, "{}\t{:04x}\t{:04x}\t{:04x}\t{:04x}\t{}\t{}", c.steps, ret, c.r[AX], c.s[DS], block.1, start, width);
+                }
+                if self.frames.is_empty() {
+                    let list = self.segments.entry(block).or_default();
+                    let last = list.iter().filter(|g| g.depth == 0 && g.slot.is_none()).map(|g| g.start).max();
+                    if last.is_some_and(|l| start <= l) {
+                        list.clear();
+                    }
+                }
+            }
+            if self.frames.len() >= 32 {
+                self.frames.clear();
+            }
+            self.frames.push(Frame { block, start, ret, sp, slot });
+        } else if let Some(f) = self.frames.last() {
+            if ip == f.ret && sp == f.sp.wrapping_add(2) {
+                let f = self.frames.pop().unwrap();
+                let end = self.m.bus.word(Cpu::address(f.block.0, f.block.1.wrapping_add(2)));
+                let depth = self.frames.len() as u8;
+                self.segments.entry(f.block).or_default().push(Segment { start: f.start, end, depth, slot: f.slot });
+            }
+        }
     }
 
     /// 換譯文表：顯示中的項目改用新表的譯文。`passthrough` 為真時是英文原版，
@@ -179,46 +222,127 @@ fn is_cjk(c: char) -> bool {
     c >= '\u{2e80}'
 }
 
-/// 依片語起點把整塊 `[8, e)` 切段組合譯文。回傳組合結果與是否每個片語段都有譯文。
-fn compose(catalog: &Catalog, raw: &[u8], starts: &[u16]) -> Option<(String, bool)> {
-    let mut cuts: Vec<usize> = starts
-        .iter()
-        .filter_map(|&s| s.checked_sub(BLOCK_DATA).map(usize::from))
-        .filter(|&c| c < raw.len())
-        .collect();
-    cuts.sort_unstable();
-    cuts.dedup();
-    if cuts.is_empty() {
+/// 依片語與插槽範圍組合整塊 `[8, e)` 的譯文（docs/spec/004 §7、§8）。
+/// 回傳組合結果與是否每個片語段都有譯文；沒有片語紀錄時回 None。
+fn compose(catalog: &Catalog, raw: &[u8], segments: &[Segment]) -> Option<(String, bool)> {
+    let end = BLOCK_DATA.saturating_add(raw.len() as u16);
+    if !segments.iter().any(|g| g.depth == 0 && g.slot.is_none() && g.start >= BLOCK_DATA && g.start < end) {
         return None;
     }
-    let mut pieces: Vec<(usize, usize, bool)> = Vec::new();
-    if cuts[0] > 0 {
-        pieces.push((0, cuts[0], false));
+    Some(compose_range(catalog, raw, segments, BLOCK_DATA, end, 0))
+}
+
+/// 區塊索引 i 的位元組（raw 從索引 8 起）。
+fn bytes(raw: &[u8], a: u16, z: u16) -> &[u8] {
+    let len = raw.len();
+    let (a, z) = (usize::from(a.saturating_sub(BLOCK_DATA)).min(len), usize::from(z.saturating_sub(BLOCK_DATA)).min(len));
+    &raw[a..z.max(a)]
+}
+
+/// 組合 `[lo, hi)`：取深度 `depth` 的片語段，其間的字（名稱、標點）保留原文。
+fn compose_range(catalog: &Catalog, raw: &[u8], segments: &[Segment], lo: u16, hi: u16, depth: u8) -> (String, bool) {
+    let mut tops: Vec<&Segment> = segments
+        .iter()
+        .filter(|g| g.depth == depth && g.slot.is_none() && g.start >= lo && g.start < hi)
+        .collect();
+    tops.sort_by_key(|g| g.start);
+    let mut pieces: Vec<(String, bool)> = Vec::new();
+    let mut pos = lo;
+    for g in tops {
+        let z = g.end.min(hi).max(g.start);
+        if g.start > pos {
+            pieces.push(gap(bytes(raw, pos, g.start)));
+        }
+        pieces.push(phrase(catalog, raw, segments, g.start, z, depth));
+        pos = z;
     }
-    for (i, &c) in cuts.iter().enumerate() {
-        pieces.push((c, cuts.get(i + 1).copied().unwrap_or(raw.len()), true));
+    if pos < hi {
+        pieces.push(gap(bytes(raw, pos, hi)));
     }
     let (mut out, mut all) = (String::new(), true);
-    for (a, z, phrase) in pieces {
-        let key = normalize(raw[a..z].to_vec(), false);
-        if key.is_empty() {
+    for (part, found) in pieces {
+        if part.is_empty() {
             continue;
         }
-        let part = match lookup_with_punct(catalog, &key) {
-            Some(zh) if phrase => zh,
-            _ => {
-                all &= !phrase;
-                String::from_utf8_lossy(&key).into_owned()
-            }
-        };
+        all &= found;
         let joined_cjk = out.chars().last().is_some_and(is_cjk) && part.chars().next().is_some_and(is_cjk);
         if !out.is_empty() && !joined_cjk {
             out.push(' ');
         }
         out.push_str(&part);
     }
-    Some((out, all))
+    (out, all)
 }
+
+/// 片語段之間的字保留原文；沒有字母時不算缺譯文。插槽名稱前的冠詞（`5718` 從字詞表附加，
+/// 例：「the 」＋遞迴片語「portrait」）中文不用，略去（docs/spec/004 §8）。
+fn gap(b: &[u8]) -> (String, bool) {
+    let key = normalize(b.to_vec(), false);
+    if ARTICLES.iter().any(|a| a.eq_ignore_ascii_case(&key)) {
+        return (String::new(), true);
+    }
+    (String::from_utf8_lossy(&key).into_owned(), !key.iter().any(u8::is_ascii_alphabetic))
+}
+
+const ARTICLES: [&[u8]; 3] = [b"the", b"a", b"an"];
+
+/// 一個片語段：沒有插槽時整段查譯文；有插槽時組出範本鍵、查範本譯文，再填入插槽譯文（§8）。
+fn phrase(catalog: &Catalog, raw: &[u8], segments: &[Segment], a: u16, z: u16, depth: u8) -> (String, bool) {
+    let mut slots: Vec<&Segment> = segments
+        .iter()
+        .filter(|g| g.depth == depth + 1 && g.slot.is_some() && g.start >= a && g.end <= z)
+        .collect();
+    slots.sort_by_key(|g| g.start);
+    let plain = normalize(bytes(raw, a, z).to_vec(), false);
+    if slots.is_empty() {
+        return match lookup_with_punct(catalog, &plain) {
+            Some(zh) => (zh, true),
+            None => (String::from_utf8_lossy(&plain).into_owned(), false),
+        };
+    }
+    let (mut key, mut fillers, mut pos) = (Vec::new(), Vec::new(), a);
+    for g in slots {
+        key.extend_from_slice(bytes(raw, pos, g.start.max(pos)));
+        let code = g.slot.unwrap_or(0);
+        key.extend_from_slice(format!("{{{code:02x}}}").as_bytes());
+        pos = g.end.max(pos);
+        let content = normalize(bytes(raw, g.start, g.end).to_vec(), false);
+        let filler = if content.is_empty() {
+            // 空插槽之後的預設代名詞併入插槽（§8）。
+            let rest = bytes(raw, pos, z);
+            match PRONOUNS.iter().find(|(en, _)| {
+                rest.starts_with(en.as_bytes()) && !rest.get(en.len()).is_some_and(u8::is_ascii_alphabetic)
+            }) {
+                Some((en, zh)) => {
+                    pos += en.len() as u16;
+                    ((*zh).to_string(), true)
+                }
+                None => (String::new(), true),
+            }
+        } else if let Some(zh) = PRONOUNS.iter().find(|(en, _)| en.as_bytes() == content.as_slice()) {
+            (zh.1.to_string(), true)
+        } else if let Some(zh) = lookup_with_punct(catalog, &content) {
+            (zh, true)
+        } else {
+            compose_range(catalog, raw, segments, g.start, g.end, depth + 2)
+        };
+        fillers.push((code, filler));
+    }
+    key.extend_from_slice(bytes(raw, pos, z));
+    let key = normalize(key, false);
+    let Some(mut zh) = lookup_with_punct(catalog, &key) else {
+        return (String::from_utf8_lossy(&plain).into_owned(), false);
+    };
+    let mut all = true;
+    for (code, (text, found)) in fillers {
+        all &= found;
+        zh = zh.replacen(&format!("{{{code:02x}}}"), text.trim(), 1);
+    }
+    (zh, all)
+}
+
+/// 預設代名詞（§8）的中文。
+const PRONOUNS: [(&str, &str); 3] = [("him", "他"), ("her", "她"), ("it", "它")];
 
 /// 讀譯文表與字型，並檢查譯文用到的每個字字型都有。
 pub fn load_text(tsv: &[std::path::PathBuf], font: Option<&std::path::PathBuf>, index: u32) -> Result<(Catalog, Option<Glyphs>), String> {
@@ -251,31 +375,68 @@ mod tests {
         Catalog::parse(&tsv).unwrap()
     }
 
+    fn seg(start: u16, end: u16, depth: u8, slot: Option<u8>) -> Segment {
+        Segment { start, end, depth, slot }
+    }
+
     #[test]
-    fn composite_joins_phrase_translations() {
-        // ex-office4：地點列 Inspect（起點 8）＋ yourself.（起點 16）。
-        let c = catalog(&[(b"Inspect", "檢查"), (b"yourself.", "你自己。")]);
-        let raw = b"Inspect yourself. ";
-        assert_eq!(compose(&c, raw, &[8, 16]), Some(("檢查你自己。".into(), true)));
+    fn consecutive_phrases_are_joined() {
+        let c = catalog(&[(b"One.", "一。"), (b"Two.", "二。")]);
+        let raw = b"One. Two. ";
+        assert_eq!(compose(&c, raw, &[seg(8, 13, 0, None), seg(13, 18, 0, None)]), Some(("一。二。".into(), true)));
         assert_eq!(compose(&c, raw, &[]), None, "沒有片語紀錄就不組合");
     }
 
     #[test]
     fn appended_punctuation_falls_back_to_the_stem() {
-        // ex-office4：「You're wearing」「a」「KGB captain's uniform」之後，遊戲另補「.」。
+        // ex-office6：「You're wearing」「a」「KGB captain's uniform」之後，遊戲另補「.」。
         let c = catalog(&[(b"You're wearing", "你穿著"), (b"a", "一件"), (b"KGB captain's uniform", "KGB 上尉制服")]);
         let raw = b"You're wearing a KGB captain's uniform.";
-        assert_eq!(compose(&c, raw, &[8, 23, 25]), Some(("你穿著一件 KGB 上尉制服。".into(), true)));
+        let segs = [seg(8, 23, 0, None), seg(23, 25, 0, None), seg(25, 47, 0, None)];
+        assert_eq!(compose(&c, raw, &segs), Some(("你穿著一件 KGB 上尉制服。".into(), true)));
+    }
+
+    #[test]
+    fn slot_template_is_filled_with_nested_phrase() {
+        // ex-office4：片語 3380 在 FEh 插槽遞迴解碼片語 3339「yourself」，「.」屬外層片語。
+        let c = catalog(&[(b"Inspect {fe}.", "檢視{fe}。"), (b"yourself", "你自己")]);
+        let raw = b"Inspect yourself. ";
+        let segs = [seg(16, 24, 2, None), seg(16, 24, 1, Some(0xfe)), seg(8, 26, 0, None)];
+        assert_eq!(compose(&c, raw, &segs), Some(("檢視你自己。".into(), true)));
+    }
+
+    #[test]
+    fn article_before_slot_name_is_dropped() {
+        // ex-scan2：插槽內容為 5718 附加的「the 」加遞迴片語「portrait」。
+        let c = catalog(&[(b"Inspect {fe}.", "檢視{fe}。"), (b"portrait", "肖像")]);
+        let raw = b"Inspect the portrait. ";
+        let segs = [seg(20, 29, 2, None), seg(16, 28, 1, Some(0xfe)), seg(8, 30, 0, None)];
+        assert_eq!(compose(&c, raw, &segs), Some(("檢視肖像。".into(), true)));
+    }
+
+    #[test]
+    fn empty_slot_takes_the_default_pronoun() {
+        let c = catalog(&[(b"Talk to {fe}.", "和{fe}交談。")]);
+        let raw = b"Talk to her. ";
+        let segs = [seg(16, 16, 1, Some(0xfe)), seg(8, 21, 0, None)];
+        assert_eq!(compose(&c, raw, &segs), Some(("和她交談。".into(), true)));
+    }
+
+    #[test]
+    fn missing_template_keeps_english_and_reports_it() {
+        let c = catalog(&[(b"yourself", "你自己")]);
+        let raw = b"Inspect yourself. ";
+        let segs = [seg(16, 24, 2, None), seg(16, 24, 1, Some(0xfe)), seg(8, 26, 0, None)];
+        assert_eq!(compose(&c, raw, &segs), Some(("Inspect yourself.".into(), false)));
     }
 
     #[test]
     fn gaps_stay_english_and_missing_phrases_are_reported() {
         let c = catalog(&[(b"hello.", "你好。")]);
         let raw = b"- Ivan: hello. bye.";
-        // 片語起點：hello. 在索引 8＋8，bye. 在 8＋15；前面的「- Ivan:」不是片語。
-        let (zh, all) = compose(&c, raw, &[16, 23]).unwrap();
+        let (zh, all) = compose(&c, raw, &[seg(16, 23, 0, None), seg(23, 27, 0, None)]).unwrap();
         assert_eq!(zh, "- Ivan: 你好。 bye.");
-        assert!(!all, "bye. 沒有譯文");
+        assert!(!all, "名稱與 bye. 沒有譯文");
     }
 
     #[test]
@@ -299,7 +460,7 @@ mod tests {
             drawn: b"Two.".to_vec(),
             block: (0x2144, 0x4434),
             raw: b"One.^Two.".to_vec(),
-            segments: vec![8, 13],
+            segments: vec![seg(8, 13, 0, None), seg(13, 17, 0, None)],
         };
         assert_eq!(shown(&c, &e), ("二。".into(), true), "第二頁");
         e.page = 0;
