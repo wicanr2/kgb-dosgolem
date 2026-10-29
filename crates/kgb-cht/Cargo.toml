@@ -9,5 +9,6 @@ repository.workspace = true
 
 [dependencies]
 ferrogolem-core = { path = "../../../ferrogolem/crates/ferrogolem-core" }
+ferrogolem-frontend = { path = "../../../ferrogolem/crates/ferrogolem-frontend" }
 fontdue = "=0.9.5"
 serde_json = "=1.0.151"

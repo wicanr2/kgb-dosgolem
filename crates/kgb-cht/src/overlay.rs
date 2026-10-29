@@ -13,6 +13,15 @@ pub const H: usize = 200 * SCALE;
 pub struct Glyphs {
     font: Font,
     cache: HashMap<(char, u32), (fontdue::Metrics, Vec<u8>)>,
+    /// 整行點陣快取：(文字, 字級) → (寬, 高, 字 alpha, 描邊 alpha)。GUI 每格重畫時不重算描邊。
+    lines: HashMap<(String, u32), LineBitmap>,
+}
+
+struct LineBitmap {
+    w: usize,
+    h: usize,
+    alpha: Vec<u8>,
+    outline: Vec<u8>,
 }
 
 impl Glyphs {
@@ -30,6 +39,7 @@ impl Glyphs {
         Ok(Self {
             font,
             cache: HashMap::new(),
+            lines: HashMap::new(),
         })
     }
     pub fn has(&self, c: char) -> bool {
@@ -136,7 +146,7 @@ pub fn rounded_outline(alpha: &[u8], w: usize, h: usize, r: f32) -> Vec<u8> {
 
 /// 先把整行字形畫進 alpha 畫布（四周留描邊空間），以圓形膨脹得到黑色描邊，
 /// 描邊與字各混合一次，避免疊印累加造成硬邊。
-fn draw_text(g: &mut Glyphs, out: &mut [u8], text: &str, x: i32, top: i32, px: u32, rgb: [u8; 3]) {
+fn line_bitmap(g: &mut Glyphs, text: &str, px: u32) -> LineBitmap {
     let pad = OUTLINE_RADIUS.ceil() as i32 + 2;
     let ascent = g.ascent(px);
     let width: i32 = text.chars().map(|c| g.advance(c, px)).sum::<i32>() + 2 * pad + px as i32 / 4;
@@ -160,7 +170,18 @@ fn draw_text(g: &mut Glyphs, out: &mut [u8], text: &str, x: i32, top: i32, px: u
         pen += m.advance_width.round() as i32;
     }
     let outline = rounded_outline(&alpha, cw, ch, OUTLINE_RADIUS);
-    for (layer, color) in [(&outline, [0, 0, 0]), (&alpha, rgb)] {
+    LineBitmap { w: cw, h: ch, alpha, outline }
+}
+
+fn draw_text(g: &mut Glyphs, out: &mut [u8], text: &str, x: i32, top: i32, px: u32, rgb: [u8; 3]) {
+    let pad = OUTLINE_RADIUS.ceil() as i32 + 2;
+    if !g.lines.contains_key(&(text.to_string(), px)) {
+        let b = line_bitmap(g, text, px);
+        g.lines.insert((text.to_string(), px), b);
+    }
+    let b = &g.lines[&(text.to_string(), px)];
+    let (cw, ch) = (b.w, b.h);
+    for (layer, color) in [(&b.outline, [0, 0, 0]), (&b.alpha, rgb)] {
         for cy in 0..ch {
             for cx in 0..cw {
                 let a = layer[cy * cw + cx];

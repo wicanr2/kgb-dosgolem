@@ -26,3 +26,5 @@
 - 進入第一章：攔到 `1d97` 章節標題、`52a0` 地點、`584f` 旁白與 `86b3` 時鐘。時鐘用特殊字型，改成只接手白名單呼叫點，其餘只記錄（kgb-r9、kgb-r10）。補 takeover 整合測試。
 - 英文退路改為只畫前 max_lines 行。
 - 使用者要求 Noto 繪製圓潤：描邊改為圓形膨脹（半徑 2、邊緣反鋸齒），描邊與字各混合一次（kgb-r11）。
+- 抽出 `session.rs`，kgb-run 改用它；改寫後 2ce8 事件原文序列與 kgb-r6 前 29 句相同（kgb-r12，180 秒虛擬時間）。
+- 新增 `kgb-play`（FerroGolem GUI 前端）與 `tools/rust.sh play`、`gui-check`；覆繪加整行點陣快取。Xvfb 驗證中文字幕在視窗中顯示（gui-k1、gui-k2）。

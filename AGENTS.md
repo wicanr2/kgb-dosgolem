@@ -11,6 +11,8 @@ tools/rust.sh fetch                  # 產生 Cargo.lock 並抓依賴，唯一�
 tools/rust.sh build                  # 離線 release 建置，產物在 workplace/target/release/
 tools/rust.sh test [測試名]          # 離線測試；單一測試照 cargo test 傳名稱
 tools/rust.sh kgb <輸出名> <步數> [--shots N]   # 接手文字 routine 跑 KGB，輸出 events.tsv 與 3 倍中文覆繪截圖
+tools/rust.sh play [--cycles N]       # 在本機 X11 桌面開視窗玩，存檔在 workplace/play/scratch
+tools/rust.sh gui-check <輸出名> <秒數>  # Xvfb＋lavapipe 無頭跑視窗，擷取 PNG
 ```
 
 - 光碟解包：`tools/extract_disc.py`，指令見 `docs/re/001-disc-inventory.md`。
@@ -18,7 +20,7 @@ tools/rust.sh kgb <輸出名> <步數> [--shots N]   # 接手文字 routine 跑 
 - 通用探針（傾印、讀取監看、截圖）用 FerroGolem 的 `tools/rust.sh probe`。
 - `tools/rust.sh` 需要 `~/cht/ferrogolem`（`FG_ROOT` 可覆寫），唯讀掛在容器的 `/ferrogolem`。
 
-結構：`crates/kgb-cht` 是 KGB 適配層（`takeover` 攔截文字 routine、`catalog` 譯文表、`overlay` 3 倍覆繪、`kgb-run` 無頭執行），依賴 FerroGolem 的 `ferrogolem-core`。GUI 尚未建立。
+結構：`crates/kgb-cht` 是 KGB 適配層：`takeover` 攔截文字 routine、`lifecycle` 覆繪消失時機、`catalog` 譯文表、`overlay` 3 倍覆繪、`session` 共用的執行迴圈；執行檔 `kgb-run`（無頭）與 `kgb-play`（視窗，FerroGolem 的 `ferrogolem-frontend`）。
 
 ## 1. 使用者定案（2026-10-29）
 
