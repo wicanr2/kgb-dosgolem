@@ -43,6 +43,79 @@ pub struct TextEvent {
     pub font_seg: u16,
     /// 真的跳過了原版繪字（呼叫點在 TAKEN_SITES）。為假時只記錄、CPU 不變。
     pub taken: bool,
+    /// 區塊：頁序，`[8, BX)` 內 `^` 的個數；單行為 0（docs/spec/004 §4）。
+    pub page: u16,
+    /// 區塊：整塊原文 `[8, e)`，正規化同 `text`；單行同 `text`。
+    pub full: Vec<u8>,
+    /// 原版這次會畫的文字 `[BX, 返回 BX)`，正規化同 `text`，去掉結尾的 `^`。英文退路用。
+    pub drawn: Vec<u8>,
+    /// 區塊鍵（DS, DI）；單行為 (0, 0)。
+    pub block: (u16, u16),
+    /// 區塊：未正規化的整塊位元組 `[8, e)`；單行同 `text`。組合多片語譯文用。
+    pub raw: Vec<u8>,
+    /// 區塊內各片語的起點索引（由 Session 依 `53d8` 紀錄填入，docs/spec/004 §7）。
+    pub segments: Vec<u16>,
+}
+
+/// 區塊資料的起點（`[DI+2]` 重設為 8：`2c40`、`7650`、`72cd`）。
+pub const BLOCK_DATA: u16 = 8;
+
+/// 比對鍵正規化：中間的 0 是 5bed 自動換行把空白改成的斷行，還原成空白；`^` 保留。
+/// 去掉結尾的 0、空白與 `^`（片語每個字後補空白），比對鍵因此與區塊寬度無關（docs/spec/004 §4）。
+pub fn normalize(mut text: Vec<u8>, trim_caret: bool) -> Vec<u8> {
+    while matches!(text.last(), Some(&0) | Some(&b' ')) || (trim_caret && text.last() == Some(&b'^')) {
+        text.pop();
+    }
+    for b in &mut text {
+        if *b == 0 {
+            *b = b' '
+        }
+    }
+    text
+}
+
+/// `86e9` 返回的 BX（docs/spec/004 §3，`86f0`–`876c`）。`b(i)` 讀區塊索引 i 的位元組，
+/// `end`＝`[DI+2]`，`bp`＝最多行數。算術照原版用 16 位元環繞。
+pub fn block_advance(b: impl Fn(u16) -> u8, bx: u16, end: u16, bp: u16) -> u16 {
+    let mut n: u16 = 0;
+    if end > bx {
+        let mut i = bx;
+        let mut al;
+        loop {
+            al = b(i);
+            i = i.wrapping_add(1);
+            if al == b'^' {
+                n = n.wrapping_add(1);
+                break;
+            }
+            if al == 0 {
+                n = n.wrapping_add(1);
+            }
+            if i == end {
+                if al != 0 {
+                    n = n.wrapping_add(1);
+                }
+                break;
+            }
+        }
+        if al | b(i.wrapping_sub(2)) == 0 {
+            n = n.wrapping_sub(1);
+        }
+        if bp < n {
+            n = bp;
+        }
+    }
+    let mut i = bx;
+    for _ in 0..n {
+        loop {
+            let c = b(i);
+            i = i.wrapping_add(1);
+            if c == b'^' || c == 0 || i >= end {
+                break;
+            }
+        }
+    }
+    i
 }
 
 #[derive(Default)]
@@ -89,18 +162,20 @@ impl Takeover {
             }
             let di = r[DI];
             let end = word(m, ds, di.wrapping_add(2));
-            let mut text: Vec<u8> = (r[BX]..end.max(r[BX]))
-                .map(|i| byte(m, ds, di.wrapping_add(i)))
-                .collect();
-            // 中間的 0 是 5bed 自動換行把空白改成的斷行，還原成空白；`^` 是原文換行，保留。
-            // 去掉結尾的 0 與空白（片語每個字後補空白），比對鍵因此與區塊寬度無關（docs/spec/004 §4）。
-            while matches!(text.last(), Some(&0) | Some(&b' ')) {
-                text.pop();
-            }
-            for b in &mut text {
-                if *b == 0 {
-                    *b = b' '
-                }
+            let at = |i: u16| byte(m, ds, di.wrapping_add(i));
+            let span = |a: u16, z: u16| (a..z.max(a)).map(at).collect::<Vec<u8>>();
+            let advance = block_advance(at, r[BX], end, r[BP]);
+            let start = BLOCK_DATA.min(r[BX]);
+            let page = span(start, r[BX]).iter().filter(|&&c| c == b'^').count() as u16;
+            let raw = span(start, end);
+            let (text, full, drawn) = (
+                normalize(span(r[BX], end), false),
+                normalize(raw.clone(), false),
+                normalize(span(r[BX], advance), true),
+            );
+            let taken = !self.passthrough && TAKEN_SITES.contains(&site);
+            if taken {
+                m.cpu.r[BX] = advance;
             }
             TextEvent {
                 step,
@@ -114,7 +189,13 @@ impl Takeover {
                 line_height: word(m, ds, 0x7691),
                 color: byte(m, ds, 0x440e),
                 font_seg: word(m, ds, 0x768f),
-                taken: !self.passthrough && TAKEN_SITES.contains(&site),
+                taken,
+                page,
+                full,
+                drawn,
+                block: (ds, di),
+                raw,
+                segments: Vec::new(),
             }
         } else {
             if site == BLOCK_INNER_RETURN || !self.signature_ok(m, cs, ip, &LINE_SIG) {
@@ -145,7 +226,6 @@ impl Takeover {
                 step,
                 kind: Kind::Line,
                 site,
-                text,
                 x: r[CX],
                 y: r[BX],
                 max_lines: 1,
@@ -154,11 +234,61 @@ impl Takeover {
                 color,
                 font_seg: word(m, ds, 0x768f),
                 taken,
+                page: 0,
+                full: text.clone(),
+                drawn: text.clone(),
+                block: (0, 0),
+                raw: text.clone(),
+                segments: Vec::new(),
+                text,
             }
         };
         if event.taken {
             m.cpu.ip = m.cpu.pop(&mut m.bus);
         }
         Some(event)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 區塊資料放在索引 8 起，回傳讀取函式與結尾索引。
+    fn block(data: &[u8]) -> (impl Fn(u16) -> u8 + '_, u16) {
+        let at = move |i: u16| if i >= 8 { data.get(usize::from(i - 8)).copied().unwrap_or(0) } else { 0x20 };
+        (at, 8 + data.len() as u16)
+    }
+
+    #[test]
+    fn caret_ends_the_page() {
+        let (b, end) = block(b"Hello^world");
+        assert_eq!(block_advance(&b, 8, end, 5), 14, "第一頁畫到 ^ 為止，BX 越過 ^");
+        assert_eq!(block_advance(&b, 14, end, 5), end, "第二頁畫到結尾");
+    }
+
+    #[test]
+    fn lines_beyond_bp_are_left_for_the_next_call() {
+        // 0 是自動換行的行界；三行但 BP＝2，只畫兩行。
+        let (b, end) = block(b"aa\0bb\0cc");
+        assert_eq!(block_advance(&b, 8, end, 2), 14);
+        assert_eq!(block_advance(&b, 8, end, 3), end);
+    }
+
+    #[test]
+    fn trailing_zeros_and_empty_blocks() {
+        let (b, end) = block(b"ab\0");
+        assert_eq!(block_advance(&b, 8, end, 5), 11);
+        let (b, end) = block(b"ab\0\0");
+        assert_eq!(block_advance(&b, 8, end, 5), 11, "結尾兩個 0 不多算一行");
+        let (b, end) = block(b"");
+        assert_eq!(block_advance(&b, 8, end, 5), 8, "空區塊 BX 不變");
+    }
+
+    #[test]
+    fn normalize_restores_wrap_spaces() {
+        assert_eq!(normalize(b"series of\0inc \0".to_vec(), false), b"series of inc");
+        assert_eq!(normalize(b"page one ^".to_vec(), true), b"page one");
+        assert_eq!(normalize(b"a^b^".to_vec(), false), b"a^b^", "比對鍵保留 ^");
     }
 }

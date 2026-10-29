@@ -8,7 +8,8 @@
 #   tools/rust.sh build            離線建置 release
 #   tools/rust.sh test             離線跑測試
 #   tools/rust.sh cargo <參數...>  離線執行任意 cargo 子命令（專案唯讀）
-#   tools/rust.sh kgb <輸出名> <步數> [--shots N]   接手文字 routine，輸出事件與中文覆繪截圖
+#   tools/rust.sh kgb <輸出名> <步數> [--shots N] [--input /inputs/<檔>] [--trace-phrases]
+#                                  接手文字 routine，輸出事件與中文覆繪截圖；輸入腳本放 workplace/inputs
 #   tools/rust.sh play [--lang zh-TW|zh-CN|en] [--cycles N]   在本機 X11 桌面開視窗玩；預設語言依主機語系
 #   tools/rust.sh gui-check <輸出名> <秒數> [--lang ...]       Xvfb 無頭跑視窗，擷取畫面為 PNG
 #                                  原版 workplace/disc/cd 唯讀共用，每次執行只建可寫暫存層，
@@ -62,14 +63,14 @@ case "$cmd" in
     mkdir -p "$ROOT/text"
     run="$WP/runs/$name"
     test ! -e "$run" || { echo "$run 已存在，換一個輸出名" >&2; exit 1; }
-    mkdir -p "$run/scratch/KGB"
+    mkdir -p "$run/scratch/KGB" "$WP/inputs"
     cp "$WP/disc/CSP.CFG" "$run/scratch/KGB/"
     tsv=(); for f in "$ROOT"/text/*.zh-TW.tsv; do test -f "$f" && tsv+=(--tsv "/text/$(basename "$f")"); done
     timeout 3600 docker run --rm -u "$(id -u):$(id -g)" --name "dgrs-kgb-$name" \
       --memory 3g --cpus 1 --pids-limit 64 --network none \
       --log-opt max-size=10m --log-opt max-file=3 \
       -v "$WP/target/release:/tool:ro" -v "$WP/disc/cd:/game:ro" -v "$ROOT/text:/text:ro" \
-      -v "$font_dir:/fonts:ro" -v "$run:/run" "$IMAGE" \
+      -v "$font_dir:/fonts:ro" -v "$WP/inputs:/inputs:ro" -v "$run:/run" "$IMAGE" \
       /tool/kgb-run --root /game --scratch /run/scratch --out /run/out --steps "$steps" \
       --font /fonts/NotoSansCJK-Medium.ttc --font-index 3 "${tsv[@]}" "${extra[@]}"
     ;;

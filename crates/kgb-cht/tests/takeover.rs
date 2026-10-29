@@ -86,7 +86,7 @@ fn layout_breaks_become_spaces_in_key() {
 }
 
 #[test]
-fn block_is_skipped_with_registers_preserved() {
+fn block_is_skipped_and_bx_advances_past_the_page() {
     let movs = [(0xbf, 0x100), (0xbb, 8), (0xb9, 0), (0xba, 0xb5), (0xbd, 2)];
     let (mut m, dir) = run_to("block", build(0x2cd6, &movs, 0x2ce5, BLOCK, false), BLOCK, block_setup);
     let before = m.cpu.r;
@@ -95,8 +95,10 @@ fn block_is_skipped_with_registers_preserved() {
     assert_eq!((e.kind, e.site, e.x, e.y, e.max_lines, e.width), (Kind::Block, 0x2ce8, 0, 181, 2, 320));
     assert_eq!(e.text, b"Hello^world", "原文的 ^ 保留");
     assert!(e.taken);
+    assert_eq!((e.page, e.drawn.as_slice()), (0, &b"Hello"[..]), "原版這次只畫第一頁");
     assert_eq!(m.cpu.ip, 0x2ce8, "模擬近返回");
-    for r in [AX, BX, CX, DX, SI, DI, BP] {
+    assert_eq!(m.cpu.r[BX], 8 + 6, "BX 越過第一頁的 ^（docs/spec/004 §3）");
+    for r in [AX, CX, DX, SI, DI, BP] {
         assert_eq!(m.cpu.r[r], before[r], "暫存器 {r} 不變");
     }
     assert_eq!(m.cpu.r[SP], before[SP].wrapping_add(2));

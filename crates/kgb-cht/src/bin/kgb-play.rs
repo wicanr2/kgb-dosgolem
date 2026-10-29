@@ -7,7 +7,6 @@
 //!
 //! 譯文目錄下的 `*.zh-TW.tsv` 給繁中、`*.zh-CN.tsv` 給簡中；字型取 TTC 的 TC（3）與 SC（2）。
 use ferrogolem_core::machine::DEFAULT_IPS;
-use ferrogolem_core::mouse::x_scale;
 use ferrogolem_frontend::{Guest, UiFont, egui, run};
 use kgb_cht::catalog::Catalog;
 use kgb_cht::lang::Lang;
@@ -61,11 +60,8 @@ impl Guest for Kgb {
         self.s.m.key(scan, ascii, down)
     }
     fn pointer(&mut self, nx: f32, ny: f32, buttons: u16) {
-        let (w, h, _) = self.s.m.bus.rgb();
-        let m = &mut self.s.m;
-        let xs = x_scale(m.bus.vga.mode);
-        m.mouse.move_to((nx * w as f32) as u16, (ny * h as f32) as u16, xs);
-        m.mouse.set_buttons(buttons);
+        self.s.m.mouse.move_to(nx, ny);
+        self.s.m.mouse.set_buttons(buttons);
     }
     fn ips(&self) -> u64 {
         self.s.m.ips

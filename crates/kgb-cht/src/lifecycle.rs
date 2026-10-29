@@ -112,6 +112,12 @@ mod tests {
                 color: 254,
                 font_seg: 0,
                 taken: true,
+                page: 0,
+                full: b"x".to_vec(),
+                drawn: b"x".to_vec(),
+                block: (0, 0),
+                raw: b"x".to_vec(),
+                segments: Vec::new(),
             },
             zh: "字".into(),
         }

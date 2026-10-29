@@ -3,6 +3,12 @@
 //!
 //! kgb-run --root <原版唯讀> --scratch <暫存層> --out <尚不存在的目錄>
 //!         [--steps N] [--shots N] [--cycles N] [--tsv <譯文表>]... [--font <ttc> --font-index N]
+//!         [--input <輸入腳本>] [--trace-phrases]
+//!
+//! 輸入腳本每行一個動作，依步數遞增，`#` 開頭為註解：
+//!   <步數> mouse <x> <y> <按鍵>     x、y 為原版畫面座標（320×200），按鍵 bit0 左、bit1 右
+//!   <步數> key <掃描碼> <ASCII> <0|1>   數值十六進位，1＝按下
+//! `--trace-phrases` 另輸出 phrases.tsv：片語解碼器 53d8 的每次呼叫（取證用）。
 use ferrogolem_core::machine::DEFAULT_IPS;
 use ferrogolem_core::png::encode_rgb;
 use kgb_cht::session::{Session, load_text};
@@ -19,6 +25,37 @@ struct Args {
     tsv: Vec<PathBuf>,
     font: Option<PathBuf>,
     font_index: u32,
+    input: Option<PathBuf>,
+    trace_phrases: bool,
+}
+
+enum Action {
+    Mouse(u16, u16, u16),
+    Key(u8, u8, bool),
+}
+
+fn parse_input(text: &str) -> Result<Vec<(u64, Action)>, String> {
+    let mut out: Vec<(u64, Action)> = Vec::new();
+    for (n, line) in text.lines().enumerate() {
+        let f: Vec<&str> = line.split_whitespace().collect();
+        if f.is_empty() || f[0].starts_with('#') {
+            continue;
+        }
+        let bad = || format!("輸入腳本第 {} 行格式錯誤：{line}", n + 1);
+        let num = |s: &str| s.parse::<u64>().map_err(|_| bad());
+        let hex = |s: &str| u8::from_str_radix(s, 16).map_err(|_| bad());
+        let step = num(f[0])?;
+        let act = match (f.get(1).copied(), f.len()) {
+            (Some("mouse"), 5) => Action::Mouse(num(f[2])? as u16, num(f[3])? as u16, num(f[4])? as u16),
+            (Some("key"), 5) => Action::Key(hex(f[2])?, hex(f[3])?, f[4] == "1"),
+            _ => return Err(bad()),
+        };
+        if out.last().is_some_and(|(s, _)| *s > step) {
+            return Err(format!("輸入腳本第 {} 行步數倒退", n + 1));
+        }
+        out.push((step, act));
+    }
+    Ok(out)
 }
 
 fn parse() -> Result<Args, String> {
@@ -26,6 +63,7 @@ fn parse() -> Result<Args, String> {
     let (mut root, mut scratch, mut out) = (None, None, None);
     let (mut steps, mut shots, mut cycles) = (2_000_000, 0, DEFAULT_IPS / 1000);
     let (mut tsv, mut font, mut font_index) = (Vec::new(), None, 3);
+    let (mut input, mut trace_phrases) = (None, false);
     while let Some(k) = it.next() {
         let mut v = || it.next().ok_or(format!("{k} 需要值"));
         match k.as_str() {
@@ -38,6 +76,8 @@ fn parse() -> Result<Args, String> {
             "--tsv" => tsv.push(PathBuf::from(v()?)),
             "--font" => font = Some(PathBuf::from(v()?)),
             "--font-index" => font_index = v()?.parse().map_err(|e| format!("--font-index：{e}"))?,
+            "--input" => input = Some(PathBuf::from(v()?)),
+            "--trace-phrases" => trace_phrases = true,
             _ => return Err(format!("未知參數 {k}")),
         }
     }
@@ -51,6 +91,8 @@ fn parse() -> Result<Args, String> {
         tsv,
         font,
         font_index,
+        input,
+        trace_phrases,
     })
 }
 
@@ -58,20 +100,44 @@ fn run(a: Args) -> Result<bool, String> {
     fs::create_dir(&a.out).map_err(|e| format!("建立 {}：{e}", a.out.display()))?;
     let (catalog, mut glyphs) = load_text(&a.tsv, a.font.as_ref(), a.font_index)?;
     let mut s = Session::new(&a.root, &a.scratch, a.cycles * 1000, catalog)?;
+    let inputs = match &a.input {
+        Some(p) => parse_input(&fs::read_to_string(p).map_err(|e| format!("{}：{e}", p.display()))?)?,
+        None => Vec::new(),
+    };
+    if a.trace_phrases {
+        s.phrase_log = Some(String::from("step\tret\tphrase\tphz\tblock\tindex\twidth\n"));
+    }
     let mut error = None;
     let mut next = if a.shots > 0 { a.shots } else { a.steps };
+    let mut pending = inputs.iter().peekable();
     while s.m.cpu.steps < a.steps && !s.m.exited && error.is_none() {
-        if let Err(e) = s.run_until(next.min(a.steps)) {
+        let target = pending.peek().map_or(next, |(st, _)| (*st).min(next)).min(a.steps);
+        if let Err(e) = s.run_until(target) {
             error = Some(e);
+        }
+        while let Some((_, act)) = pending.next_if(|(st, _)| *st <= s.m.cpu.steps) {
+            match *act {
+                Action::Mouse(x, y, b) => {
+                    let (w, h, _) = s.m.bus.rgb();
+                    s.m.mouse.move_to(f32::from(x) / w as f32, f32::from(y) / h as f32);
+                    s.m.mouse.set_buttons(b);
+                }
+                Action::Key(scan, ascii, down) => s.m.key(scan, ascii, down),
+            }
         }
         if a.shots > 0 && s.m.cpu.steps >= next {
             let (w, h, rgb) = s.compose(glyphs.as_mut());
             let name = format!("shot-{:010}.png", s.m.cpu.steps);
             fs::write(a.out.join(name), encode_rgb(w, h, &rgb)).map_err(|e| e.to_string())?;
+            next += a.shots.max(1);
+        } else if a.shots == 0 && s.m.cpu.steps >= next {
+            next = a.steps;
         }
-        next += a.shots.max(1);
     }
     fs::write(a.out.join("events.tsv"), &s.log).map_err(|e| e.to_string())?;
+    if let Some(log) = &s.phrase_log {
+        fs::write(a.out.join("phrases.tsv"), log).map_err(|e| e.to_string())?;
+    }
     let report = json!({
         "executed": s.m.cpu.steps, "error": error, "at": format!("{:04x}:{:04x}", s.m.cpu.start.0, s.m.cpu.start.1),
         "cycles_per_ms": a.cycles, "virtual_ms": u128::from(s.m.cpu.steps) * 1000 / u128::from(s.m.ips.max(1)),
