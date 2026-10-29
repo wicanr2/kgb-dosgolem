@@ -272,7 +272,32 @@ fn shown(catalog: &Catalog, e: &TextEvent) -> (String, bool) {
             return (page(&zh, usize::from(e.page)), all);
         }
     }
+    if let Some(r) = by_pattern(catalog, &e.text) {
+        return r;
+    }
     (String::from_utf8_lossy(&e.drawn).into_owned(), false)
+}
+
+/// 樣式列（docs/spec/004 §9）：執行期填入地點與數字的選單列。
+fn by_pattern(catalog: &Catalog, text: &[u8]) -> Option<(String, bool)> {
+    let text = String::from_utf8_lossy(text).replace(" ,", ",");
+    catalog.patterns().iter().find_map(|(p, zh)| {
+        let caps = crate::catalog::match_pattern(p, &text)?;
+        let mut out = zh.clone();
+        let mut all = true;
+        for (i, cap) in caps.iter().enumerate() {
+            let part = if cap.bytes().all(|b| b.is_ascii_digit()) {
+                cap.clone()
+            } else if let Some(z) = lookup_with_punct(catalog, cap.as_bytes()) {
+                z
+            } else {
+                all = false;
+                cap.clone()
+            };
+            out = out.replace(&format!("{{{i}}}"), &part);
+        }
+        Some((out, all))
+    })
 }
 
 /// 片語段查譯文；查不到且結尾是遊戲另外附加的標點時，以去掉標點的字幹查，標點換成全形

@@ -13,6 +13,37 @@ use std::collections::HashMap;
 #[derive(Default)]
 pub struct Catalog {
     map: HashMap<u64, String>,
+    /// 樣式列（docs/spec/004 §9）：（英文樣式, 譯文），`{0}`… 為執行期欄位。
+    patterns: Vec<(String, String)>,
+}
+
+/// 依樣式比對原文，成功時回傳各欄位（去頭尾空白、不可為空）。字面段各取第一次出現。
+pub fn match_pattern(pattern: &str, text: &str) -> Option<Vec<String>> {
+    let mut lits: Vec<&str> = Vec::new();
+    let mut rest = pattern;
+    while let Some(a) = rest.find('{') {
+        let z = rest[a..].find('}')? + a;
+        lits.push(&rest[..a]);
+        rest = &rest[z + 1..];
+    }
+    lits.push(rest);
+    let mut pos = text.strip_prefix(lits[0])?;
+    let mut caps = Vec::new();
+    for (i, lit) in lits.iter().enumerate().skip(1) {
+        let (cap, after) = if lit.is_empty() && i == lits.len() - 1 {
+            (pos, "")
+        } else {
+            let at = pos.find(lit)?;
+            (&pos[..at], &pos[at + lit.len()..])
+        };
+        let cap = cap.trim();
+        if cap.is_empty() {
+            return None;
+        }
+        caps.push(cap.to_string());
+        pos = after;
+    }
+    pos.is_empty().then_some(caps)
 }
 
 /// FNV-1a 64 位元（offset basis cbf29ce484222325、prime 100000001b3）。
@@ -62,6 +93,7 @@ fn key_bytes(key: &str) -> Result<Vec<u8>, String> {
 impl Catalog {
     pub fn parse(tsv: &str) -> Result<Self, String> {
         let mut map = HashMap::new();
+        let mut patterns = Vec::new();
         for (n, line) in tsv.lines().enumerate() {
             if line.is_empty() || line.starts_with('#') {
                 continue;
@@ -69,6 +101,12 @@ impl Catalog {
             let cols: Vec<&str> = line.split('\t').collect();
             if cols.len() != 3 {
                 return Err(format!("第 {} 行欄數 {}，應為 3", n + 1, cols.len()));
+            }
+            if let Some(p) = cols[0].strip_prefix("pattern:") {
+                if !cols[1].is_empty() {
+                    patterns.push((p.to_string(), cols[1].replace("\\n", "\n")));
+                }
+                continue;
             }
             let key = match cols[0].strip_prefix("fnv64:") {
                 Some(h) if h.len() == 16 => {
@@ -84,10 +122,14 @@ impl Catalog {
                 return Err(format!("第 {} 行 key 重複：{}", n + 1, cols[0]));
             }
         }
-        Ok(Self { map })
+        Ok(Self { map, patterns })
     }
     pub fn get(&self, text: &[u8]) -> Option<&str> {
         self.map.get(&fnv64(text)).map(String::as_str)
+    }
+    /// 樣式列（docs/spec/004 §9）。
+    pub fn patterns(&self) -> &[(String, String)] {
+        &self.patterns
     }
     pub fn len(&self) -> usize {
         self.map.len()
@@ -97,7 +139,7 @@ impl Catalog {
     }
     /// 譯文用到的全部字元（產生字型子集與缺字檢查用）。
     pub fn chars(&self) -> std::collections::BTreeSet<char> {
-        self.map.values().flat_map(|s| s.chars()).collect()
+        self.map.values().chain(self.patterns.iter().map(|(_, z)| z)).flat_map(|s| s.chars()).collect()
     }
 }
 
@@ -115,6 +157,18 @@ mod tests {
         assert_eq!(c.get(b"Nope"), None, "空譯文視為未譯");
         assert!(Catalog::parse("a\tb\n").is_err(), "欄數不符要失敗");
         assert!(Catalog::parse("a\tb\tc\na\td\te\n").is_err(), "key 重複要失敗");
+    }
+
+    #[test]
+    fn patterns_capture_runtime_fields() {
+        let p = "Save Game {0}, Used, {1}, Rating {2}";
+        let caps = match_pattern(p, "Save Game 1, Used, your office, Rating 1").unwrap();
+        assert_eq!(caps, ["1", "your office", "1"]);
+        assert_eq!(match_pattern(p, "Save Game 1, Free"), None);
+        assert_eq!(match_pattern("Load Game {0}, {1}, Rating {2}", "Load Game , x, Rating 1"), None, "欄位不得為空");
+        let c = Catalog::parse("pattern:Load Game {0}, {1}, Rating {2}\t讀取遊戲 {0}，{1}，評分 {2}\tx\n").unwrap();
+        assert_eq!(c.patterns().len(), 1);
+        assert!(c.is_empty(), "樣式列不進一般比對表");
     }
 
     #[test]

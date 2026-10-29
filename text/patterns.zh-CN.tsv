@@ -1,0 +1,4 @@
+# 由 kgb-zhcn 從 patterns.zh-TW.tsv 產生，不要手改；改繁中或譯名表後重產。
+# 样式列（docs/spec/004 §9）：运行期填入地点与数字的菜单列。三栏：pattern:英文样式、译文、出处。
+pattern:Load Game {0}, {1}, Rating {2}	读取游戏 {0}，{1}，评分 {2}	sys:load
+pattern:Save Game {0}, Used, {1}, Rating {2}	保存游戏 {0}，已使用，{1}，评分 {2}	sys:save
