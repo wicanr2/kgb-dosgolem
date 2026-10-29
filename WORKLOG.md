@@ -19,3 +19,4 @@
 - 覆繪第一次沒字：`[440e]`＝254 在當時 DAC 為黑，實際字色是 255；依驅動程式碼改用 `[440e]+1`。
 - 使用者指示不再跑 Go dosgolem 當基準，改用 `~/cht/dosgolem-rust`（分支 `kgb-oracle`，worktree `~/workspace/dosgolem-rust-kgb`）。go-r4 的結果未採用。
 - 使用者決定另開新 repo FerroGolem：clean-room、RRSAL 的 Rust DOS 模擬器，以 MVP 方式先讓 KGB 能跑；本庫留作 KGB 中文化並依賴它。
+- kgb-oracle 跑出開場：6 句字幕與攔到的事件相同；字卡是圖片，新增 worklist `image-localization`。

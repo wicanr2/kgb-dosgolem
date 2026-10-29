@@ -73,6 +73,17 @@
     "kind": "manual",
     "note": "完成後改綁 docs/re 的 IDA 收據"
    }
+  },
+  {
+   "id": "image-localization",
+   "layer": "kgb",
+   "title": "語系圖片中文化（字卡等）",
+   "body": "開場字卡「Moscow, August 1991...」不經文字 routine，推測為 TCD1A.SCR（另有 D、F、S 版）。TCD2*、TH*.SQX 也可能是語系圖片。",
+   "acceptance": "取證 SCR 格式與顯示路徑，定出圖片覆繪或替換方式的規格。",
+   "verify": {
+    "kind": "manual",
+    "note": "規格完成後改綁該規格"
+   }
   }
  ]
 }
