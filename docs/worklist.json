@@ -73,21 +73,6 @@
     "kind": "manual",
     "note": "完成後改綁 docs/re 的 IDA 收據"
    }
-  },
-  {
-   "id": "dep-ferrogolem",
-   "layer": "kgb",
-   "title": "本庫改依賴 FerroGolem",
-   "body": "核心已搬到 ~/cht/ferrogolem。本庫應刪除 crates/dosgolem-core 與 dgrs-probe，改以路徑依賴 ferrogolem-core。",
-   "acceptance": "kgb-cht 以 ferrogolem-core 建置並重跑開場事件相同。",
-   "verify": {
-    "kind": "absent",
-    "paths": [
-     "crates/kgb-cht/Cargo.toml"
-    ],
-    "pattern": "ferrogolem-core",
-    "note": "改依賴後即成立"
-   }
   }
  ]
 }
