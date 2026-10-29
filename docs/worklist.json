@@ -10,27 +10,12 @@
   {
    "id": "english-track",
    "layer": "kgb",
-   "title": "A 與 U 英文章節檔擇一",
-   "body": "CHAP{1..4}{A,D,F,S,U} 的語系對應未證實；CHAP2 沒有 U。",
-   "acceptance": "解出 SQX 後比對 A、U 內容，記錄差異並定比對鍵。",
+   "title": "各章使用哪一組英文檔",
+   "body": "第一章開 CHAP1U.*（docs/re/004）。CHAP2 沒有 U 組，第二章用哪組未量。",
+   "acceptance": "各章實際開檔紀錄。",
    "verify": {
     "kind": "manual",
     "note": "完成後改綁 docs/re 的比對收據"
-   }
-  },
-  {
-   "id": "sqx-format",
-   "layer": "kgb",
-   "title": "SQX 壓縮格式",
-   "body": "多數資源與文字在 .SQX。格式未知。",
-   "acceptance": "解壓工具對全部 SQX 成功，並以執行期記憶體內容對照驗證。",
-   "verify": {
-    "kind": "absent",
-    "paths": [
-     "tools"
-    ],
-    "pattern": "def unsqx",
-    "note": "解壓工具出現即視為完成第一步"
    }
   },
   {
@@ -53,6 +38,32 @@
    "verify": {
     "kind": "manual",
     "note": "規格完成後改綁該規格"
+   }
+  },
+  {
+   "id": "chapter1-translation",
+   "layer": "kgb",
+   "title": "第一章片語翻譯（3,999 句）",
+   "body": "已以遊戲解碼器萃取第一章 U 組全部片語（docs/re/004），約 16 萬字元。尚無譯文。",
+   "acceptance": "text/chapter1.zh-TW.tsv 涵蓋全部非空片語，術語表一致，字型無缺字。",
+   "verify": {
+    "kind": "absent",
+    "paths": [
+     "text"
+    ],
+    "pattern": "Your first day at Department P",
+    "note": "譯文表出現第 460 號片語即視為已開始"
+   }
+  },
+  {
+   "id": "composite-blocks",
+   "layer": "kgb",
+   "title": "多片語組成的文字區塊",
+   "body": "執行期區塊可能由多個片語與物件名稱組成，整塊比對鍵查不到。",
+   "acceptance": "攔截 53d8 記錄區塊內各片語的範圍，以片語譯文組成中文；寫成規格並以第一章對話驗證。",
+   "verify": {
+    "kind": "manual",
+    "note": "規格完成後改綁"
    }
   }
  ]

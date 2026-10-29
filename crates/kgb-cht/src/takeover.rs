@@ -90,13 +90,14 @@ impl Takeover {
             let mut text: Vec<u8> = (r[BX]..end.max(r[BX]))
                 .map(|i| byte(m, ds, di.wrapping_add(i)))
                 .collect();
-            // 86e9 把 0 與 `^` 都當換行；比對鍵去掉結尾的 0，中間的 0 寫成 `^`（docs/spec/004 §4）。
-            while text.last() == Some(&0) {
+            // 中間的 0 是 5bed 自動換行把空白改成的斷行，還原成空白；`^` 是原文換行，保留。
+            // 去掉結尾的 0 與空白（片語每個字後補空白），比對鍵因此與區塊寬度無關（docs/spec/004 §4）。
+            while matches!(text.last(), Some(&0) | Some(&b' ')) {
                 text.pop();
             }
             for b in &mut text {
                 if *b == 0 {
-                    *b = b'^'
+                    *b = b' '
                 }
             }
             TextEvent {

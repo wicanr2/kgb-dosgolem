@@ -71,6 +71,21 @@ fn block_setup(m: &mut Machine) {
 }
 
 #[test]
+fn layout_breaks_become_spaces_in_key() {
+    // 5bed 自動換行把空白改成 0；比對鍵要還原成空白，結尾的 0 與空白去掉。
+    let movs = [(0xbf, 0x100), (0xbb, 8), (0xb9, 0), (0xba, 0xb5), (0xbd, 2)];
+    let (mut m, dir) = run_to("wrap", build(0x2cd6, &movs, 0x2ce5, BLOCK, false), BLOCK, |m| {
+        let base = usize::from(m.psp) * 16 + 0x100;
+        m.bus.set_word(base + 2, 8 + 14);
+        m.bus.ram[base + 8..base + 8 + 14].copy_from_slice(b"series of\0incs");
+        m.bus.ram[base + 8 + 13] = b' ';
+    });
+    let e = Takeover::default().intercept(&mut m).unwrap();
+    assert_eq!(e.text, b"series of inc");
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn block_is_skipped_with_registers_preserved() {
     let movs = [(0xbf, 0x100), (0xbb, 8), (0xb9, 0), (0xba, 0xb5), (0xbd, 2)];
     let (mut m, dir) = run_to("block", build(0x2cd6, &movs, 0x2ce5, BLOCK, false), BLOCK, block_setup);
@@ -78,7 +93,7 @@ fn block_is_skipped_with_registers_preserved() {
     let mut t = Takeover::default();
     let e = t.intercept(&mut m).expect("應攔截");
     assert_eq!((e.kind, e.site, e.x, e.y, e.max_lines, e.width), (Kind::Block, 0x2ce8, 0, 181, 2, 320));
-    assert_eq!(e.text, b"Hello^world");
+    assert_eq!(e.text, b"Hello^world", "原文的 ^ 保留");
     assert!(e.taken);
     assert_eq!(m.cpu.ip, 0x2ce8, "模擬近返回");
     for r in [AX, BX, CX, DX, SI, DI, BP] {
