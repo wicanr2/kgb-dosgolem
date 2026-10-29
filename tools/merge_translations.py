@@ -8,6 +8,10 @@
 import os, sys
 
 
+# 開發期的除錯佔位字串，遊戲內不顯示，不進譯文表。
+PLACEHOLDER = "bugbugbug."
+
+
 def load(path, cols):
     rows = []
     for n, line in enumerate(open(path, encoding="utf-8"), 1):
@@ -25,6 +29,7 @@ def main(batches, done, out, prefix):
     errors, merged, seen = [], [], {}
     names = sorted(f for f in os.listdir(batches) if f.endswith(".tsv"))
     missing = [f for f in names if not os.path.exists(os.path.join(done, f))]
+    skipped = 0
     for f in names:
         if f in missing:
             continue
@@ -34,6 +39,9 @@ def main(batches, done, out, prefix):
             errors.append(f"{f}：id 序列不同（{len(src)} 對 {len(dst)} 列）")
             continue
         for (i, en), (_, zh) in zip(src, dst):
+            if en == PLACEHOLDER:
+                skipped += 1
+                continue
             where = f"{f} id {i}"
             if not zh.strip():
                 errors.append(f"{where}：譯文空白")
@@ -55,7 +63,7 @@ def main(batches, done, out, prefix):
         for en, zh, i in merged:
             w.write(f"{en}\t{zh}\t{prefix}:{i}\n")
     dup = {en: v[2] for en, v in seen.items() if v[2]}
-    print(f"合併 {len(merged)} 列；缺批次 {len(missing)}：{missing[:5]}；同 key 不同譯 {len(dup)} 組（取第一個）")
+    print(f"略過佔位 {skipped} 列；合併 {len(merged)} 列；缺批次 {len(missing)}：{missing[:5]}；同 key 不同譯 {len(dup)} 組（取第一個）")
 
 
 if __name__ == "__main__":
