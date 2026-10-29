@@ -61,6 +61,17 @@
     "kind": "manual",
     "note": "規格完成後改綁"
    }
+  },
+  {
+   "id": "help-video-hang",
+   "layer": "core",
+   "title": "第一章說明影片在 FerroGolem 卡住",
+   "body": "第一章辦公室右鍵（或一段時間後）開始播放說明影片（推測 HELP.BGF），畫面停在第一格，時鐘不再更新；ex-scan6 從 1.09B 到 1.5B 步沒有進展，停在 188b:2ecf（反覆檢查 [0674] 是否改變，推測由中斷更新的畫格計數）。開場影片在同一核心可正常播放。",
+   "acceptance": "與 kgb-oracle 同輸入對照，找出 [0674] 的更新來源並在 FerroGolem 補齊；說明影片播放完畢回到場景。",
+   "verify": {
+    "kind": "manual",
+    "note": "修正後改綁實機收據"
+   }
   }
  ]
 }
