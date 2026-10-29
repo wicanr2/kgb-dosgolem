@@ -11,9 +11,11 @@
 //! 把插槽內容換成 `{字碼}`（兩位十六進位）。沒有插槽的片語該欄為空。
 //!
 //! kgb-extract --root <原版唯讀> --scratch <暫存層> --out <輸出 TSV> [--steps N] [--cycles N]
-//!             [--sweep 起-迄]   另從「起」依序解碼片語表之外的片語到「迄」（十六進位偏移）
+//!             [--sweep 起-迄|auto]   另從「起」依序解碼片語表之外的片語到「迄」（十六進位偏移）；
+//!                                    auto 從表內最後一個片語的結尾掃到 PHZ 檔尾
+//!             [--chapter N]          以遊戲的載檔程式 2394 換載第 N 章的 WRQ、PHZ 後再萃取（docs/re/004）
 //! 輸出欄 bits_last：片語結束時最後載入的位元組被讀了幾個位元。
-use ferrogolem_core::cpu::{AX, CS, DI, DS, ES, IF, SI, SP, SS};
+use ferrogolem_core::cpu::{AX, BX, CS, DI, DS, DX, ES, IF, SI, SP, SS};
 use ferrogolem_core::cpu::Cpu;
 use kgb_cht::catalog::key_of;
 use kgb_cht::session::TAIL;
@@ -35,6 +37,7 @@ fn main_inner() -> Result<(), String> {
     let (mut root, mut scratch, mut out) = (None, None, None);
     let (mut steps, mut cycles) = (930_000_000u64, 1000u64);
     let mut sweep: Option<(u16, u16)> = None;
+    let (mut sweep_auto, mut chapter) = (false, 1u16);
     while let Some(k) = it.next() {
         let mut v = || it.next().ok_or(format!("{k} 需要值"));
         match k.as_str() {
@@ -43,8 +46,13 @@ fn main_inner() -> Result<(), String> {
             "--out" => out = Some(PathBuf::from(v()?)),
             "--steps" => steps = v()?.parse().map_err(|e| format!("--steps：{e}"))?,
             "--cycles" => cycles = v()?.parse().map_err(|e| format!("--cycles：{e}"))?,
+            "--chapter" => chapter = v()?.parse().map_err(|e| format!("--chapter：{e}"))?,
             "--sweep" => {
                 let r = v()?;
+                if r == "auto" {
+                    sweep_auto = true;
+                    continue;
+                }
                 let (a, z) = r.split_once('-').ok_or("--sweep 格式為 起-迄（十六進位）")?;
                 let p = |x: &str| u16::from_str_radix(x, 16).map_err(|e| format!("--sweep：{e}"));
                 sweep = Some((p(a)?, p(z)?));
@@ -60,6 +68,10 @@ fn main_inner() -> Result<(), String> {
     }
     let code = m.psp + 0x10;
     let data = code + DATA;
+    let mut phz_len = None;
+    if chapter != 1 {
+        phz_len = Some(load_chapter(&mut m, code, data, chapter)?);
+    }
     let phz = word(&m, data, 0x06dc);
     let count = word(&m, phz, 0) / 2;
     let mut tsv = String::from("index\toffset\tstatus\ttext\ttemplate\tsi_end\tbits_last\n");
@@ -76,6 +88,12 @@ fn main_inner() -> Result<(), String> {
         }
         let d = decode(&mut m, code, data, phz, off);
         row(i.to_string(), off, &d);
+    }
+    if sweep_auto {
+        let last = word(&m, phz, (count - 1) * 2);
+        let d = decode(&mut m, code, data, phz, last);
+        let from = if d.ax_end <= 2 { d.si_end.wrapping_sub(1) } else { d.si_end };
+        sweep = Some((from, phz_len.unwrap_or(0xe70a)));
     }
     // 片語表之外的片語（docs/re/004）：從「起」依序解碼。下一個片語的起點由最後載入的位元組
     // 讀了幾個位元決定：1–2 個時為返回 SI－1，3–8 個時為返回 SI（以片語表內 3,065 組相鄰
@@ -95,6 +113,50 @@ fn main_inner() -> Result<(), String> {
     fs::write(out.ok_or("缺 --out")?, tsv).map_err(|e| e.to_string())?;
     println!("phrases={count} ok={ok} failed={failed} templates={templates} phz={phz:04x}");
     Ok(())
+}
+
+/// 章節檔名表（LANG 資源段，第一章 5411h）：第一章的清單在 012Dh，第 2–4 章的清單指標在 0127h 起；
+/// 每份清單依序為 WRQ、PHZ、SQX、OB、TH 的「旗標位元組＋檔名」位址，0 結束（docs/re/004）。
+const NAMES: u16 = 0x5411 - 0x188b;
+const FILE_LOAD: u16 = 0x2394;
+
+/// 以遊戲的載檔程式 `2394`（ES:BX＝ES:DX＝旗標位元組（檔名在下一位元組）、DI:SI＝目的地）把第 N 章的 WRQ 與 PHZ
+/// 載到第一章用的段（`[06da]`、`[06dc]`）。回傳 PHZ 的長度（位元組，最後一次讀檔實際讀到的數量）。
+fn load_chapter(m: &mut Machine, code: u16, data: u16, chapter: u16) -> Result<u16, String> {
+    let names = code + NAMES;
+    let list = if chapter == 1 { 0x012d } else { word(m, names, 0x0127 + (chapter - 2) * 2) };
+    let mut len = 0;
+    for (k, target) in [(0u16, 0x06dau16), (1, 0x06dc)] {
+        let entry = word(m, names, list + k * 2);
+        let saved = m.cpu.clone();
+        m.cpu.s[CS] = code;
+        m.cpu.ip = FILE_LOAD;
+        m.cpu.s[DS] = data;
+        m.cpu.s[ES] = names;
+        m.cpu.r[BX] = entry;
+        m.cpu.r[DX] = entry; // 2394 自己把 DX 加 1 跳過旗標位元組（ex-open1：int 21h 時 DX＝BX＋1）
+        m.cpu.r[DI] = word(m, data, target);
+        m.cpu.r[SI] = 0;
+        let (ss, sp) = (m.cpu.s[SS], m.cpu.r[SP].wrapping_sub(2));
+        m.cpu.r[SP] = sp;
+        m.bus.set_word(Cpu::address(ss, sp), SENTINEL);
+        let limit = m.cpu.steps + 50_000_000;
+        while !(m.cpu.s[CS] == code && m.cpu.ip == SENTINEL) {
+            if m.cpu.steps > limit {
+                return Err(format!("第 {chapter} 章載檔逾時"));
+            }
+            m.step()?;
+        }
+        // 2394 的成功路徑不清 CF（23ce–23d7 的移位留下的位元），以開檔紀錄判斷成敗。
+        match m.file_log.last() {
+            Some(e) if e.ah == 0x3d && e.result >= 0 => {}
+            other => return Err(format!("第 {chapter} 章載檔失敗（{entry:04x}，{:?}）", other.map(|e| (&e.name, e.result)))),
+        }
+        // 精確長度取最後一次 DOS 讀檔實際讀到的位元組數（[0722] 是進位到段的長度，掃描會超出檔尾）。
+        len = m.read_log.last().map_or(0, |r| r.4);
+        m.cpu = saved;
+    }
+    Ok(len)
 }
 
 struct Decoded {
