@@ -1,0 +1,34 @@
+{
+  "repository": "https://github.com/wicanr2/dosgolem",
+  "commit": "f79eab6db8c64a524a06535e53e5d32b0bbcf7c8",
+  "license": "RRSAL-1.0",
+  "author": "Wang Chun-Yu (wicanr2)",
+  "scope": "Rust port of the listed Go real-mode primitives; no GPL rust-dos source included",
+  "files": {
+    "internal/cpu/cpu.go": "26626407d13928c6f4b26ad984d60a3639be05da54b576c169c3b66651cd829c",
+    "internal/cpu/alu.go": "c5196bdd6b66e78a60b9439ec6ce1c4ea3e86274d139038ed9b38fb867e49b81",
+    "internal/cpu/modrm.go": "c2bfc3e30e384eee73ea70eda577185292164903b559d9e6634c9756c0ba19d0",
+    "internal/cpu/ops.go": "922ecbdf2199d0d151b09a92ec29fdc3cc8632b077d8be90fa0e227ee824aa0c",
+    "internal/cpu/string.go": "9a87d42dbafbd3a5e0f37249a02db17c5f6d52f92d0186e61e9177f23bdb3e53",
+    "internal/cpu/ops186.go": "80ffc59dd3782e5366422ddafdd7f9e346918a812d327f7afb9c8004f9c049f0",
+    "internal/cpu/cycles.go": "b76a21813e199f14a49f8e5fedbe0f66624e526b48694ecbc6dea0238cc862c8",
+    "internal/machine/loader.go": "c36c1440fe9878773f8f4c7357b5a17c00466b36f0f527338c7fd841ac49db7b",
+    "LICENSE": "74d24a2784097f88a19c489bc3806187244335d1af62483ad5f1c7a387c3473b",
+    "internal/machine/vga.go": "607c0942b05e1cea0587833aa798dba5d992a989245c764c31c43ada587b823b",
+    "internal/machine/romfont8x8.go": "17a693f53d4ca772dbec3a7578c5f95bafa8a29488e71974de56ee9536ddf995",
+    "internal/dos/bios.go": "98e714982b30ffbe5ee803e567e749f6b4764a0460f43ef0a6f6d8a96684ad1b",
+    "internal/dos/int21.go": "8c955a09779e99bdce39f1a7ccbe46c8b954b3fca4f302fc3fca577c8a88144d",
+    "internal/dos/int10text.go": "ddfc7b56024605587ab9dce59be608790f2e5605437c5e9269828e5256649bdf",
+    "internal/machine/machine.go": "4b52b42007485e2b464bc47ada00146186ad6f88379af03be397cb051d677f6c"
+  },
+  "font": {
+    "file": "src/native/font.rs",
+    "author": "Daniel Hepper",
+    "license": "Public Domain",
+    "source": "https://github.com/dhepper/font8x8/blob/master/font8x8_basic.h"
+  },
+  "project_patch": {
+    "path": "xiake-dosgolem/tools/dosgolem-invalid-high-mcb.patch",
+    "sha256": "f4e30a31e05e8ecf22e494cc9bcab5495b464c2ddb74a49bc3330bc7304d53ac"
+  }
+}

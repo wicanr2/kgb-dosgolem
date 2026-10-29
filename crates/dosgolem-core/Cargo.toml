@@ -1,0 +1,11 @@
+[package]
+name = "dosgolem-core"
+version = "0.1.0"
+description = "RRSAL real-mode DOS core seeded from dosgolem-rust-xaika src/native"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde_json = "=1.0.151"

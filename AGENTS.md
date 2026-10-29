@@ -4,6 +4,21 @@
 
 本檔是代理與協作者的常駐規則。現況看 `CONTEXT.md`，歷程與勘誤看 `WORKLOG.md`。面向使用者的文件、註解與 commit message 用繁體中文。
 
+## 0. 常用指令
+
+```sh
+tools/rust.sh fetch                  # 產生 Cargo.lock 並抓依賴，唯一開網路的一步
+tools/rust.sh build                  # 離線 release 建置，產物在 workplace/target/release/
+tools/rust.sh test [-p dosgolem-core] [測試名]   # 離線測試；單一測試照 cargo test 傳名稱
+tools/rust.sh probe <輸出名> <步數>   # 自有核心跑 KGB 啟動器，輸出 workplace/runs/<輸出名>/out/
+```
+
+- 光碟解包：`tools/extract_disc.py`，指令見 `docs/re/001-disc-inventory.md`。
+- 未完成項：`python3 -I tools/worklist.py verify /project`（容器內，專案唯讀掛在 `/project`），`selftest` 驗檢查器本身。
+- Go 基準：`workplace/bin/dosgolem-probe-f79eab6`，建置與參數見 `docs/re/002-boot-gap-ledger.md`。
+
+結構：`crates/dosgolem-core` 是通用核心（CPU、MZ、DOS／BIOS、VGA、PIT），`crates/dgrs-probe` 是不認識遊戲的研究探針。KGB 適配層與 GUI 尚未建立。
+
 ## 1. 使用者定案（2026-10-29）
 
 - 執行器：建立自有 Rust 核心，RRSAL-1.0。先讓 KGB 能跑，之後以此為 base 整合相關 repo（`~/cht/dosgolem-rust`、`dosgolem-rust-san5`、`dosgolem-rust-sc`、`dosgolem-rust-xaika` 等）。整合是後續工作，每個 repo 動手前另問。

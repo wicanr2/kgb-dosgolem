@@ -1,0 +1,16 @@
+{
+ "repository": "https://github.com/wicanr2/dosgolem-rust-xaika",
+ "commit": "dd3f8b88aa4f0d811bc623da32fccb91dc455058",
+ "license": "RRSAL-1.0",
+ "author": "Wang Chun-Yu (wicanr2)",
+ "scope": "src/native copied as the dosgolem-core seed; the Go origin is listed in external/rrsal-go/source.json",
+ "files": {
+  "src/native/cpu.rs": "9063f5be61a5052f643d6914b19ad3c0ba4903a6c6806d8decf9abdc068739b2",
+  "src/native/cpu_ops.rs": "5c3e5a25e2118edc9f61d597debac37c4f452823e5a5acf2688a5472f29db005",
+  "src/native/font.rs": "490c4357a75269d33bc68689b9dd58df49d66870eb78df9d8e57aa703baf54c8",
+  "src/native/machine.rs": "d89b97b9bc2f0e566f91ede081b79ea5c94c32cfabad52200c30b05ab75808e0",
+  "src/native/machine_services.rs": "8d17c57218dcbabb491456c30751ed5e5dcb70a215876c22c1fe9ec994e86efe",
+  "src/native/memory.rs": "dd2e9d450db7e0e375d35bae1bc89c194c61882f3ce1ce5820d8719632527a79",
+  "src/native/mz.rs": "b82548a7a984879a469fcdec65f5d98c3b7446355d5d564779f444d1f72b1b68"
+ }
+}

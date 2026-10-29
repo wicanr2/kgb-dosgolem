@@ -1,0 +1,83 @@
+{
+ "schema": "dosgolem-rs-worklist/1",
+ "note": "verify 為真＝仍未完成。只掃產品程式碼（crates/、tools/），不掃測試。用 tools/worklist.py 執行。",
+ "layers": {
+  "core": "自有核心缺的平台服務，KGB 正常啟動會撞到",
+  "kgb": "KGB 適配、格式與中文化",
+  "frontend": "玩家可操作的前端"
+ },
+ "items": [
+  {
+   "id": "ems-int67",
+   "layer": "core",
+   "title": "EMS int 67h 未實作",
+   "body": "自有核心第 398,768 步停在 188b:3580 `int 67h AX=4102`（docs/re/002）。Go 基準同位置配置 handle 1、32 頁。",
+   "acceptance": "依 Go dosgolem docs/spec/008-ems-paging、014-ems 移植；KGB 越過 EMS 配置且單元測試涵蓋偵測簽章與映射。",
+   "verify": {"kind": "absent", "paths": ["crates/dosgolem-core/src"], "pattern": "fn ems_call", "note": "EMS 分派函式出現即視為已接上"}
+  },
+  {
+   "id": "mouse-int33",
+   "layer": "core",
+   "title": "滑鼠 int 33h 只有 AX=0",
+   "body": "Go 基準用到 0000、0003、0004、0007、0008。種子核心只回 AX=0 的「無滑鼠」。",
+   "acceptance": "依 Go dosgolem 滑鼠契約移植上述功能並接前端輸入。",
+   "verify": {"kind": "absent", "paths": ["crates/dosgolem-core/src"], "pattern": "fn mouse_call", "note": "滑鼠分派函式出現即視為已接上"}
+  },
+  {
+   "id": "vga-mode13",
+   "layer": "core",
+   "title": "VGA mode 13h 畫面與 DAC",
+   "body": "Go 基準在 #476,822 切到 mode 13h。種子核心的 rgb() 只處理文字模式與平面模式。",
+   "acceptance": "mode 13h 畫面與 Go 基準同步數的 indexed 與色盤雜湊相同。",
+   "verify": {"kind": "manual", "note": "完成後改綁 mode 13h 繪圖函式名或對拍收據數量"}
+  },
+  {
+   "id": "sound-blaster",
+   "layer": "core",
+   "title": "Sound Blaster 與 OPL 埠",
+   "body": "Go 基準寫過 224、225、226、22C、388、389。種子核心只有部分 OPL 狀態。",
+   "acceptance": "依 Go dosgolem sb_dsp 與 OPL 契約移植，KGB 偵測與音樂路徑不報錯。",
+   "verify": {"kind": "manual", "note": "完成後改綁 DSP 狀態型別名"}
+  },
+  {
+   "id": "mscdex",
+   "layer": "core",
+   "title": "MSCDEX int 2Fh AH=15h",
+   "body": "啟動器從 D: 讀資料。Go 基準掛了 MSCDEX，是否被查詢尚未量。",
+   "acceptance": "量出 KGB 用到的 MSCDEX 功能並依 Go docs/spec/434-mscdex-minimal 移植。",
+   "verify": {"kind": "absent", "paths": ["crates/dosgolem-core/src"], "pattern": "fn mscdex_call", "note": "MSCDEX 分派函式出現即視為已接上"}
+  },
+  {
+   "id": "boot-to-logos",
+   "layer": "core",
+   "title": "自有核心跑到 LOGOS.BGF 片頭",
+   "body": "Go 基準 50M 步內播放 LOGOS.BGF。自有核心尚未到達。",
+   "acceptance": "同步數下開檔順序與 Go 基準一致，畫面雜湊相同。",
+   "verify": {"kind": "manual", "note": "對拍工具完成後改綁收據"}
+  },
+  {
+   "id": "english-track",
+   "layer": "kgb",
+   "title": "A 與 U 英文章節檔擇一",
+   "body": "CHAP{1..4}{A,D,F,S,U} 的語系對應未證實；CHAP2 沒有 U。",
+   "acceptance": "解出 SQX 後比對 A、U 內容，記錄差異並定比對鍵。",
+   "verify": {"kind": "manual", "note": "完成後改綁 docs/re 的比對收據"}
+  },
+  {
+   "id": "sqx-format",
+   "layer": "kgb",
+   "title": "SQX 壓縮格式",
+   "body": "多數資源與文字在 .SQX。格式未知。",
+   "acceptance": "解壓工具對全部 SQX 成功，並以執行期記憶體內容對照驗證。",
+   "verify": {"kind": "absent", "paths": ["tools"], "pattern": "def unsqx", "note": "解壓工具出現即視為完成第一步"}
+  },
+  {
+   "id": "gui",
+   "layer": "frontend",
+   "title": "無 SDL2 的 GUI 前端",
+   "body": "定案用 winit／wgpu／egui。尚未建立。",
+   "acceptance": "可冷開機到 KGB 標題並用鍵鼠操作。",
+   "verify": {"kind": "absent", "paths": ["crates"], "pattern": "winit", "note": "GUI crate 出現即視為已建立"}
+  }
+ ]
+}
