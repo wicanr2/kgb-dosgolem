@@ -100,36 +100,76 @@ fn blend(dst: &mut [u8], at: usize, rgb: [u8; 3], a: u8) {
     }
 }
 
+/// 描邊半徑（輸出像素）。
+pub const OUTLINE_RADIUS: f32 = 2.0;
+
+/// 圓形膨脹：每個像素取鄰近字形 alpha × 圓盤權重的最大值。圓盤邊緣做反鋸齒
+/// （權重＝clamp(r＋0.5−距離, 0, 1)），描邊因此是圓角、不呈方塊。
+pub fn rounded_outline(alpha: &[u8], w: usize, h: usize, r: f32) -> Vec<u8> {
+    let reach = r.ceil() as i32 + 1;
+    let mut kernel = Vec::new();
+    for dy in -reach..=reach {
+        for dx in -reach..=reach {
+            let weight = (r + 0.5 - ((dx * dx + dy * dy) as f32).sqrt()).clamp(0.0, 1.0);
+            if weight > 0.0 {
+                kernel.push((dx, dy, weight));
+            }
+        }
+    }
+    let mut out = vec![0u8; w * h];
+    for y in 0..h as i32 {
+        for x in 0..w as i32 {
+            let mut best = 0.0f32;
+            for &(dx, dy, weight) in &kernel {
+                let (sx, sy) = (x + dx, y + dy);
+                if sx < 0 || sy < 0 || sx >= w as i32 || sy >= h as i32 {
+                    continue;
+                }
+                let a = f32::from(alpha[sy as usize * w + sx as usize]) * weight;
+                best = best.max(a);
+            }
+            out[y as usize * w + x as usize] = best.round() as u8;
+        }
+    }
+    out
+}
+
+/// 先把整行字形畫進 alpha 畫布（四周留描邊空間），以圓形膨脹得到黑色描邊，
+/// 描邊與字各混合一次，避免疊印累加造成硬邊。
 fn draw_text(g: &mut Glyphs, out: &mut [u8], text: &str, x: i32, top: i32, px: u32, rgb: [u8; 3]) {
-    let base = top + g.ascent(px);
-    let outline = SCALE as i32 / 2 + 1;
-    for pass in 0..2 {
-        let mut pen = x;
-        for c in text.chars() {
-            let (m, bitmap) = g.glyph(c, px).clone();
-            let gx = pen + m.xmin;
-            let gy = base - m.ymin - m.height as i32;
-            let offsets: Vec<(i32, i32)> = if pass == 0 {
-                (-outline..=outline)
-                    .flat_map(|dy| (-outline..=outline).map(move |dx| (dx, dy)))
-                    .collect()
-            } else {
-                vec![(0, 0)]
-            };
-            let color = if pass == 0 { [0, 0, 0] } else { rgb };
-            for (ox, oy) in offsets {
-                for row in 0..m.height {
-                    for col in 0..m.width {
-                        let a = bitmap[row * m.width + col];
-                        let (px_, py) = (gx + col as i32 + ox, gy + row as i32 + oy);
-                        if a == 0 || px_ < 0 || py < 0 || px_ >= W as i32 || py >= H as i32 {
-                            continue;
-                        }
-                        blend(out, (py as usize * W + px_ as usize) * 3, color, a);
-                    }
+    let pad = OUTLINE_RADIUS.ceil() as i32 + 2;
+    let ascent = g.ascent(px);
+    let width: i32 = text.chars().map(|c| g.advance(c, px)).sum::<i32>() + 2 * pad + px as i32 / 4;
+    let height = px as i32 * 3 / 2 + 2 * pad;
+    let (cw, ch) = (width.max(1) as usize, height.max(1) as usize);
+    let mut alpha = vec![0u8; cw * ch];
+    let mut pen = pad;
+    for c in text.chars() {
+        let (m, bitmap) = g.glyph(c, px).clone();
+        let gx = pen + m.xmin;
+        let gy = pad + ascent - m.ymin - m.height as i32;
+        for row in 0..m.height {
+            for col in 0..m.width {
+                let (cx, cy) = (gx + col as i32, gy + row as i32);
+                if cx >= 0 && cy >= 0 && (cx as usize) < cw && (cy as usize) < ch {
+                    let at = cy as usize * cw + cx as usize;
+                    alpha[at] = alpha[at].max(bitmap[row * m.width + col]);
                 }
             }
-            pen += m.advance_width.round() as i32;
+        }
+        pen += m.advance_width.round() as i32;
+    }
+    let outline = rounded_outline(&alpha, cw, ch, OUTLINE_RADIUS);
+    for (layer, color) in [(&outline, [0, 0, 0]), (&alpha, rgb)] {
+        for cy in 0..ch {
+            for cx in 0..cw {
+                let a = layer[cy * cw + cx];
+                let (ox, oy) = (x - pad + cx as i32, top - pad + cy as i32);
+                if a == 0 || ox < 0 || oy < 0 || ox >= W as i32 || oy >= H as i32 {
+                    continue;
+                }
+                blend(out, (oy as usize * W + ox as usize) * 3, color, a);
+            }
         }
     }
 }
@@ -174,4 +214,21 @@ pub fn compose(rgb320: &[u8], items: &[Item], dac: &[[u8; 3]; 256], g: &mut Glyp
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn outline_of_a_dot_is_a_round_disk() {
+        let (w, h) = (11, 11);
+        let mut a = vec![0u8; w * h];
+        a[5 * w + 5] = 255;
+        let o = rounded_outline(&a, w, h, 2.0);
+        assert_eq!(o[5 * w + 6], 255, "距離 1 完全覆蓋");
+        assert_eq!(o[5 * w + 7], 128, "距離 2＝半徑，反鋸齒覆蓋一半");
+        assert_eq!(o[7 * w + 7], 0, "對角距離 2.83 在圓外：方形核會在這裡畫滿");
+        assert_eq!(o[5 * w + 8], 0, "距離 3 在圓外");
+    }
 }
