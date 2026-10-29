@@ -45,3 +45,5 @@
 - 插槽範本（spec 004 §8）：「Inspect him.」的 him 不是字面文字。解碼器遇到 1FFAh 以上的字碼時呼叫 `56d5`，填入物件名稱（字詞表名稱＋遞迴片語）或預設代名詞。`kgb-extract` 加記插槽，輸出 `{字碼}` 範本（extract-2，40 個）；`tools/make_templates.py` 產生 `text/chapter1-templates.zh-TW.tsv`（38 個不重複範本，譯文帶插槽標記）。執行期以返回位址與 SP 追蹤 `53d8`、`56d5` 的巢狀範圍組合譯文，冠詞略去。第一章辦公室懸停的地點列全部中文（ex-scan3：檢視辦公室、窗戶、畫像、地圖）。事件紀錄加 segments 欄。
 - 第一章辦公室實機探索：左鍵檢視畫像顯示「V.I. Lenin.」描述（已譯）；懸停掃描找到窗戶、辦公室、檔案櫃、畫像、地圖的地點列（全部中文）。說明影片（右鍵或一段時間後）在 FerroGolem 停在第一格（188b:2ecf 等 [0674] 改變），新增 worklist `help-video-hang`。動作選單尚未觸發到。
 - 說明影片卡住的原因在 FerroGolem：SB `D0h` 暫停後直接送新的 `14h`，暫停狀態沒有解除，DMA 不前進、IRQ 7 不來（ex-scan7，`kgb-run` 報告加讀檔、開檔、暫存器與 SB 狀態）。FerroGolem 依 DOSBox-X 修正後，影片播完回到場景，600M 步懸停掃描中，除時鐘外 62 種文字事件全部有譯文（ex-scan8）。worklist `help-video-hang` 結案。右鍵是動作選單（圖片按鈕），併入 `image-localization`。
+- 對話選單：左鍵點別洛夫開出「You say／You ask about／You talk about／You ask for」選單，由 `3e13`（`87d8` 單行）逐行置中畫出，行尾 7Fh 是子選單箭頭（ex-belov1）。接手 `3e13`：單行事件另記英文寬（同 `87c2`）與置中旗標，覆繪以英文行中點置中；行尾 7Fh 去掉後查譯文、補「 ▶」（spec 004 §3）。
+- 選單片語不在片語索引表內：CHAP1U.PHZ 在表內最後一個片語（DF83h）之後還有 216 個片語，由其他結構直接以偏移引用。`kgb-extract --sweep` 依序解碼，下一片語的起點依最後位元組讀了幾個位元決定（表內 3,065 組相鄰片語歸納）。新增第 30 批（207 列）送譯，範本增至 46 個。

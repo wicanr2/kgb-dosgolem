@@ -178,6 +178,14 @@ impl Session {
 /// 3. 有片語起點紀錄時逐段組合譯文，顯示第「頁序」頁；4. 都不行時以英文畫原版這次會畫的文字。
 /// 譯文以 `^` 分頁。
 fn shown(catalog: &Catalog, e: &TextEvent) -> (String, bool) {
+    // 對話選單行尾的 7Fh 是遊戲字型的右箭頭（子選單，docs/spec/004 §3）。
+    if let Some(stem) = e.text.strip_suffix(&[0x7f]) {
+        let mut inner = e.clone();
+        inner.text = normalize(stem.to_vec(), false);
+        inner.drawn = inner.text.clone();
+        let (zh, found) = shown(catalog, &inner);
+        return (format!("{zh} ▶"), found);
+    }
     let page = |zh: &str, k: usize| {
         let pages: Vec<&str> = zh.split('^').collect();
         pages.get(k).or(pages.last()).map_or_else(String::new, |p| p.trim().to_string())
@@ -440,6 +448,42 @@ mod tests {
     }
 
     #[test]
+    fn submenu_arrow_is_kept_after_translation() {
+        // ex-belov1：對話選單「You say  」＋7Fh（遊戲字型的右箭頭）。
+        let c = catalog(&[(b"You say", "你說")]);
+        let mut e = line_event(b"You say  \x7f");
+        assert_eq!(shown(&c, &e), ("你說 ▶".into(), true));
+        e.text = b"You shout  \x7f".to_vec();
+        e.drawn = e.text.clone();
+        assert_eq!(shown(&c, &e), ("You shout ▶".into(), false), "未譯時英文也換成箭頭");
+    }
+
+    fn line_event(text: &[u8]) -> TextEvent {
+        TextEvent {
+            step: 0,
+            kind: crate::takeover::Kind::Line,
+            site: 0x3e13,
+            text: text.to_vec(),
+            x: 0,
+            y: 0,
+            max_lines: 1,
+            width: 0,
+            line_height: 9,
+            color: 0,
+            font_seg: 0,
+            taken: true,
+            page: 0,
+            full: text.to_vec(),
+            drawn: text.to_vec(),
+            block: (0, 0),
+            raw: text.to_vec(),
+            en_width: 40,
+            centered: true,
+            segments: Vec::new(),
+        }
+    }
+
+    #[test]
     fn composite_pages_follow_carets() {
         let c = catalog(&[(b"One.^", "一。^"), (b"Two.", "二。")]);
         let mut e = TextEvent {
@@ -460,6 +504,8 @@ mod tests {
             drawn: b"Two.".to_vec(),
             block: (0x2144, 0x4434),
             raw: b"One.^Two.".to_vec(),
+            en_width: 0,
+            centered: false,
             segments: vec![seg(8, 13, 0, None), seg(13, 17, 0, None)],
         };
         assert_eq!(shown(&c, &e), ("二。".into(), true), "第二頁");

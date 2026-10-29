@@ -7,8 +7,11 @@ use ferrogolem_core::machine::Machine;
 pub const BLOCK: u16 = 0x86e9;
 pub const LINE: u16 = 0x87d8;
 /// 接手（跳過原版繪字）的呼叫點；其他呼叫點只記錄、原版照畫（docs/spec/004 §3）。
-/// 2ce8 開場字幕、1d97 章節標題列、52a0 地點標籤、584f 旁白。時鐘 86b3 用特殊數字字型，不接手。
-pub const TAKEN_SITES: [u16; 4] = [0x2ce8, 0x1d97, 0x52a0, 0x584f];
+/// 2ce8 開場字幕、1d97 章節標題列、52a0 地點標籤、584f 旁白、3e13 對話選單。
+/// 時鐘 86b3 用特殊數字字型，不接手。
+pub const TAKEN_SITES: [u16; 5] = [0x2ce8, 0x1d97, 0x52a0, 0x584f, 0x3e13];
+/// 呼叫端依英文寬度置中的單行呼叫點（docs/spec/004 §3）。
+const CENTERED_SITES: [u16; 1] = [0x3e13];
 /// `86e9` 內部呼叫 `87d8` 後的返回偏移。
 const BLOCK_INNER_RETURN: u16 = 0x8762;
 const BLOCK_SIG: [u8; 16] = [
@@ -53,6 +56,10 @@ pub struct TextEvent {
     pub block: (u16, u16),
     /// 區塊：未正規化的整塊位元組 `[8, e)`；單行同 `text`。組合多片語譯文用。
     pub raw: Vec<u8>,
+    /// 單行：原版字型下的英文寬度（像素，同 `87c2`）；區塊為 0。
+    pub en_width: u16,
+    /// 單行：呼叫端依英文寬度置中（覆繪改以英文行中點置中）。
+    pub centered: bool,
     /// 區塊內由 `53d8`（片語）與 `56d5`（插槽）寫入的範圍，由 Session 填入（docs/spec/004 §7、§8）。
     pub segments: Vec<Segment>,
 }
@@ -66,6 +73,19 @@ pub struct Segment {
     pub depth: u8,
     /// 插槽字碼（`56d5` 的 AL）；片語為 None。
     pub slot: Option<u8>,
+}
+
+/// 原版字型下一串字的寬度，逐字同 `87c2`：`[768f]` 段的字寬表取字形位址，
+/// 字形首位元組為寬度，加 `[7693]` 字距，取低位元組。
+fn text_width(m: &Machine, text: &[u8]) -> u16 {
+    let ds = 0x2144u16.wrapping_sub(0x188b).wrapping_add(m.psp.wrapping_add(0x10));
+    let (font, spacing) = (word(m, ds, 0x768f), word(m, ds, 0x7693));
+    text.iter()
+        .map(|&c| {
+            let glyph = word(m, font, u16::from(c.wrapping_sub(0x20)) << 1);
+            u16::from(spacing.wrapping_add(u16::from(byte(m, font, glyph))) as u8)
+        })
+        .sum()
 }
 
 /// 區塊資料的起點（`[DI+2]` 重設為 8：`2c40`、`7650`、`72cd`）。
@@ -206,6 +226,8 @@ impl Takeover {
                 drawn,
                 block: (ds, di),
                 raw,
+                en_width: 0,
+                centered: false,
                 segments: Vec::new(),
             }
         } else {
@@ -250,6 +272,8 @@ impl Takeover {
                 drawn: text.clone(),
                 block: (0, 0),
                 raw: text.clone(),
+                en_width: text_width(m, &text),
+                centered: CENTERED_SITES.contains(&site),
                 segments: Vec::new(),
                 text,
             }

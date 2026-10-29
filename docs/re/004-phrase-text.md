@@ -30,3 +30,7 @@
 - 片語中有 `#` 字元（例：`Kruglov# No, the numbers are wrong# ...`），用途未知。
 - 執行期的文字區塊可能由多個片語與物件名稱組成；單一片語區塊可直接以片語譯文對上，組合規則見 docs/spec/004 §7、§8。
 - 插槽（`workplace/runs/extract-2`，同一萃取另記 `56d5` 的範圍與字碼）：40 個片語含插槽，字碼只有 FAh、FCh、FEh；萃取時 FAh 插槽為空，FCh、FEh 插槽為空且後接預設代名詞「him」。片語原文與 extract-1 逐字相同。範本譯文表由 `tools/make_templates.py` 產生（`text/chapter1-templates.zh-TW.tsv`）。
+- 片語表之外的片語（extract-7，`kgb-extract --sweep df83-e70a`）：表內最後一個片語結束於 DF83h，CHAP1U.PHZ 長 E70Ah，其間另有 216 個片語不在索引表內，由其他資料結構直接以偏移引用（例：對話選單 `3d37` 的 E171h「You say」、E177h「You ask about」）。內容為選項選單、存讀檔、對話選單、場景選擇句與標語。最後一筆（E6F6h）是法文的開發訊息，不譯。
+- 依序解碼的起點規則：片語結束時，最後載入的位元組若只讀了 1–2 個位元，下一個片語起於返回時的 SI－1，讀了 3–8 個位元則起於 SI。以片語表內 3,065 組相鄰片語歸納，沒有例外（extract-6 的 bits_last 欄）。強推論。
+- 存讀檔字串（E01Ch、E074h 等 8 個）在萃取時夾著執行期的日期與數字欄位，解出的內容不可用，待另行處理。
+

@@ -228,9 +228,15 @@ pub fn compose(rgb320: &[u8], items: &[Item], dac: &[[u8; 3]; 256], g: &mut Glyp
                 }
             }
             Kind::Line => {
-                let x = i32::from(e.x) * SCALE as i32;
+                let text = it.zh.replace('\n', " ");
+                let mut x = i32::from(e.x) * SCALE as i32;
+                if e.centered {
+                    // 原版依英文寬度置中（docs/spec/004 §3）：中文改以英文行的中點置中。
+                    let lw: i32 = text.chars().map(|c| g.advance(c, px)).sum();
+                    x += i32::from(e.en_width) * SCALE as i32 / 2 - lw / 2;
+                }
                 let top = i32::from(e.y) * SCALE as i32;
-                draw_text(g, &mut out, &it.zh.replace('\n', " "), x, top, px, rgb);
+                draw_text(g, &mut out, &text, x, top, px, rgb);
             }
         }
     }

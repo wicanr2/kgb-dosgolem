@@ -117,6 +117,8 @@ mod tests {
                 drawn: b"x".to_vec(),
                 block: (0, 0),
                 raw: b"x".to_vec(),
+                en_width: 0,
+                centered: false,
                 segments: Vec::new(),
             },
             zh: "字".into(),
