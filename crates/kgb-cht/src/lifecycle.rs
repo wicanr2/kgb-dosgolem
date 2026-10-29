@@ -41,10 +41,13 @@ pub fn rect(item: &Item) -> (usize, usize, usize, usize) {
 }
 
 impl Screen {
-    /// 新事件取代同一呼叫點、同一種類的舊項目。
+    /// 新事件取代同一呼叫點、同一種類的舊項目；單行另要同一 y（選單逐行畫在同一呼叫點，ex-belov5）。
     pub fn on_event(&mut self, item: Item) {
-        self.live
-            .retain(|l| l.item.event.site != item.event.site || l.item.event.kind != item.event.kind);
+        let e = &item.event;
+        self.live.retain(|l| {
+            let o = &l.item.event;
+            o.site != e.site || o.kind != e.kind || (e.kind == Kind::Line && o.y != e.y)
+        });
         self.live.push(Live {
             item,
             committed: false,
@@ -159,5 +162,22 @@ mod tests {
         s.on_event(subtitle(200));
         assert_eq!(s.items().len(), 1);
         assert_eq!(s.items()[0].event.step, 200);
+    }
+
+    #[test]
+    fn menu_lines_at_different_y_coexist() {
+        // ex-belov5：對話選單四行都從 3e13 畫出，只有同一 y 的行互相取代。
+        let line = |y: u16, step: u64| {
+            let mut it = subtitle(step);
+            (it.event.kind, it.event.site, it.event.y) = (Kind::Line, 0x3e13, y);
+            it
+        };
+        let mut s = Screen::default();
+        for (i, y) in [108, 119, 130, 141].into_iter().enumerate() {
+            s.on_event(line(y, i as u64));
+        }
+        assert_eq!(s.items().len(), 4);
+        s.on_event(line(119, 10));
+        assert_eq!(s.items().len(), 4, "同一 y 取代");
     }
 }

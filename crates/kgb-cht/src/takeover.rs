@@ -275,7 +275,8 @@ impl Takeover {
                 en_width: text_width(m, &text),
                 centered: CENTERED_SITES.contains(&site),
                 segments: Vec::new(),
-                text,
+                // 比對鍵與區塊相同正規化（選單子項目結尾帶空白，ex-belov4）。
+                text: normalize(text, false),
             }
         };
         if event.taken {
