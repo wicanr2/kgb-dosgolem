@@ -3,7 +3,10 @@
 //! （commit dd3f8b8），該程式移植自 Go dosgolem f79eab6；不含 rust-dos 實作。
 //! 來源與雜湊見 `external/xaika-native/source.json`。
 pub mod cpu;
+pub mod dma;
+pub mod ems;
 mod font;
 pub mod machine;
 pub mod memory;
 pub mod mz;
+pub mod sb;

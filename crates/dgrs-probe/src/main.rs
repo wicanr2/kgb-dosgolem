@@ -119,6 +119,12 @@ fn run(a: Args) -> Result<bool, String> {
             "AX={:04x} BX={:04x} CX={:04x} DX={:04x} SI={:04x} DI={:04x} BP={:04x} SP={:04x} DS={:04x} ES={:04x} SS={:04x} CS={:04x}",
             r[AX], r[BX], r[CX], r[DX], r[SI], r[DI], r[BP], r[SP], s[DS], s[ES], s[SS], s[CS]),
         "status": m.status(),
+        "sb": {"dma_requests": format!("{:?}", m.bus.sb.dma_requests), "rate": m.bus.sb.rate, "time_constant": m.bus.sb.time_constant, "speaker_on": m.bus.sb.speaker_on},
+        "dma": {"mask": m.bus.dma.mask, "mode": m.bus.dma.mode, "base": m.bus.dma.base, "page": format!("{:?}", m.bus.dma.page)},
+        "files": m.file_log.iter().map(|e| format!("#{} {:02x} {} -> {}", e.step, e.ah, e.name, e.result)).collect::<Vec<_>>(),
+        "irq7_delivered": m.irq7_delivered,
+        "hooked_vectors": (0..256usize).filter(|n| m.bus.word(n * 4 + 2) != 0x80).map(|n| format!("{n:02x}={:04x}:{:04x}", m.bus.word(n * 4 + 2), m.bus.word(n * 4))).collect::<Vec<_>>(),
+        "ems": {"handles": m.ems.layout(), "unsupported": m.ems.unsupported, "ops": m.ems.ops.iter().take(64).map(|o| json!({"step": o.step, "ah": o.ah, "al": o.al, "dx": o.handle, "bx": o.value, "status": o.status})).collect::<Vec<_>>()},
     });
     let text = serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?;
     fs::write(a.out.join("report.json"), &text).map_err(|e| e.to_string())?;

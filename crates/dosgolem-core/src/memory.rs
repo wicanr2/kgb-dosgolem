@@ -55,7 +55,8 @@ impl Default for Vga {
 }
 impl Vga {
     pub fn planar(&self) -> bool {
-        matches!(self.mode, 0x0d..=0x12)
+        // mode 13h 清掉序列器鏈結位元（Mode X）時走平面（Go vga.go planarActive）。
+        matches!(self.mode, 0x0d..=0x12) || (self.mode == 0x13 && self.seq[4] & 8 == 0)
     }
     pub fn reset(&mut self, mode: u8) {
         self.mode = mode;
@@ -80,6 +81,31 @@ impl Vga {
         self.ac_data = false;
         self.ac_index = 0;
         self.crtc_index = 0;
+        if mode == 0x13 {
+            // Go vga.go setMode13：鏈結位元立起、起點歸零、列距 28h。
+            self.seq[4] = 0x0e;
+            self.crtc[0x0c] = 0;
+            self.crtc[0x0d] = 0;
+            self.crtc[0x13] = 0x28;
+            self.crtc[0x14] = 0x40;
+            self.crtc[0x17] = 0xa3;
+        }
+    }
+    /// mode 13h 畫面的 DAC 索引：鏈結時讀 A0000 線性記憶體，非鏈結時依 Go `Unchained256` 組四平面。
+    pub fn indexed13(&self, linear: &[u8]) -> Vec<u8> {
+        let (w, h) = (320usize, 200usize);
+        let start = (usize::from(self.crtc[12]) << 8) | usize::from(self.crtc[13]);
+        if self.seq[4] & 8 != 0 {
+            return (0..w * h).map(|i| linear[(start * 4 + i) & 0xffff]).collect();
+        }
+        let pitch = if self.crtc[0x13] != 0 { usize::from(self.crtc[0x13]) * 2 } else { w / 4 };
+        let mut out = vec![0; w * h];
+        for y in 0..h {
+            for x in 0..w {
+                out[y * w + x] = self.planes[(x & 3) * 65536 + ((start + y * pitch + (x >> 2)) & 0xffff)];
+            }
+        }
+        out
     }
     pub fn read(&mut self, off: usize) -> u8 {
         let off = off & 65535;
@@ -258,6 +284,17 @@ pub struct Memory {
     pub scans: VecDeque<u8>,
     pub port_error: Option<String>,
     pub pit_divisor: u32,
+    pub sb: crate::sb::SbDsp,
+    pub dma: crate::dma::Dma8237,
+    /// 8259 主片 IMR（埠 21h）。
+    pub pic_mask: u8,
+    pub fdc_dor: u8,
+    /// IRQ 7 掛起（SB 傳輸結束）。
+    pub irq7_pending: bool,
+    sb_transfer: Option<Transfer>,
+    /// SB 8 位元 DMA 傳出的樣本，尚未混音；前端取走後清空。
+    pub dac_out: Vec<u8>,
+    pub dac_dropped: u64,
     pit_control: u8,
     pit_high: bool,
     pit_latch: u16,
@@ -276,6 +313,14 @@ impl Default for Memory {
             scans: VecDeque::new(),
             port_error: None,
             pit_divisor: 65536,
+            sb: crate::sb::SbDsp::with_dma(),
+            dma: crate::dma::Dma8237::default(),
+            pic_mask: 0,
+            fdc_dor: 0x0c,
+            irq7_pending: false,
+            sb_transfer: None,
+            dac_out: Vec::new(),
+            dac_dropped: 0,
             pit_control: 0x36,
             pit_high: false,
             pit_latch: 0,
@@ -287,8 +332,62 @@ impl Default for Memory {
         }
     }
 }
+/// 種子的 CPU 週期時鐘：IRQ0 每 PIT 分頻 × 4 週期，PIT 為 1,193,182 Hz。
+pub const CYCLES_PER_SECOND: u64 = 4 * 1_193_182;
+const DAC_CAP: usize = 1 << 22;
+
+/// SB 8 位元單次 DMA 傳輸（docs/spec/003 §3）。
+struct Transfer {
+    remaining: u32,
+    next_at: u64,
+    period: u64,
+}
+
 impl Memory {
+    fn start_sb_transfer(&mut self, n: u32) {
+        let (num, den) = self.sb.rate;
+        let period = (CYCLES_PER_SECOND * den / num.max(1)).max(1);
+        self.sb_transfer = Some(Transfer {
+            remaining: n,
+            next_at: self.cycles + period,
+            period,
+        });
+    }
+    /// 推進 SB DMA：到期就從通道 1 讀一個位元組。通道遮罩時暫停。傳完掛起 IRQ 7。
+    pub fn tick_devices(&mut self) {
+        while let Some(t) = &mut self.sb_transfer {
+            if self.cycles < t.next_at || self.dma.mask & 2 != 0 {
+                return;
+            }
+            t.next_at += t.period;
+            t.remaining -= 1;
+            let done = t.remaining == 0;
+            let page = usize::from(self.dma.page[1].unwrap_or(0));
+            let at = (page << 16) | usize::from(self.dma.current[2]);
+            let v = self.ram[at & 0xfffff];
+            self.dma.current[2] = self.dma.current[2].wrapping_add(1);
+            self.dma.current[3] = self.dma.current[3].wrapping_sub(1);
+            if self.dac_out.len() < DAC_CAP {
+                self.dac_out.push(v)
+            } else {
+                self.dac_dropped += 1
+            }
+            if done {
+                self.sb_transfer = None;
+                self.sb.irq_pending = true;
+                self.irq7_pending = true;
+            }
+        }
+    }
     pub fn rgb(&self) -> (usize, usize, Vec<u8>) {
+        if self.vga.mode == 0x13 {
+            let idx = self.vga.indexed13(&self.ram[0xa0000..0xb0000]);
+            let mut rgb = Vec::with_capacity(idx.len() * 3);
+            for i in idx {
+                rgb.extend(self.vga.dac[usize::from(i)].map(|x| (x << 2) | (x >> 4)));
+            }
+            return (320, 200, rgb);
+        }
         if self.vga.mode != 3 {
             return self.vga.rgb();
         }
@@ -353,6 +452,16 @@ impl Bus for Memory {
         if let Some(v) = self.vga.input(p) {
             return v;
         }
+        if (0x220..=0x22f).contains(&p) {
+            if let Some(v) = self.sb.input(p) {
+                return v;
+            }
+        }
+        if crate::dma::Dma8237::handles(p) {
+            if let Some(v) = self.dma.input(p) {
+                return v;
+            }
+        }
         match p {
             0x3da | 0x3ba => {
                 self.vga.ac_data = false;
@@ -385,7 +494,8 @@ impl Bus for Memory {
             0x64 => u8::from(!self.scans.is_empty()),
             0x388 => self.opl_status,
             0x389 => 255,
-            0x20 | 0x21 | 0xa0 | 0xa1 => 0,
+            0x21 => self.pic_mask,
+            0x20 | 0xa0 | 0xa1 => 0,
             _ => {
                 self.port_error = Some(format!("unsupported input port {p:04x}"));
                 255
@@ -394,6 +504,15 @@ impl Bus for Memory {
     }
     fn output(&mut self, p: u16, v: u8) {
         if self.vga.output(p, v) {
+            return;
+        }
+        if (0x220..=0x22f).contains(&p) && self.sb.output(p, v) {
+            if let Some(n) = self.sb.start8.take() {
+                self.start_sb_transfer(n);
+            }
+            return;
+        }
+        if crate::dma::Dma8237::handles(p) && self.dma.output(p, v) {
             return;
         }
         match p {
@@ -432,8 +551,119 @@ impl Bus for Memory {
                     }
                 }
             }
-            0x20 | 0x21 | 0xa0 | 0xa1 => {}
+            0x21 => self.pic_mask = v,
+            // 軟碟控制器 DOR：本機沒有軟碟，只保存寫入值（KGB 寫 0Ch 關馬達）。
+            0x3f2 => self.fdc_dor = v,
+            // 命令與 EOI 接受、不追蹤 in-service（docs/spec/003 §4）。
+            0x20 | 0xa0 | 0xa1 => {}
             _ => self.port_error = Some(format!("unsupported output port {p:04x} value {v:02x}")),
         }
+    }
+}
+
+#[cfg(test)]
+mod transfer_tests {
+    use super::*;
+
+    fn program(m: &mut Memory, page: u8, addr: u16, len: u8) {
+        m.output(0x0a, 5);
+        m.output(0x0c, 0);
+        m.output(0x0b, 0x49);
+        m.output(0x02, addr as u8);
+        m.output(0x02, (addr >> 8) as u8);
+        m.output(0x03, len.wrapping_sub(1));
+        m.output(0x03, 0);
+        m.output(0x83, page);
+        m.output(0x0a, 1);
+        m.output(0x226, 1);
+        m.output(0x226, 0);
+        m.output(0x22c, 0x40);
+        m.output(0x22c, 100);
+        m.output(0x22c, 0x14);
+        m.output(0x22c, len.wrapping_sub(1));
+        m.output(0x22c, 0);
+    }
+
+    #[test]
+    fn single_transfer_reads_bytes_then_raises_irq7() {
+        let mut m = Memory::default();
+        m.ram[0x517f1..0x517f4].copy_from_slice(&[7, 8, 9]);
+        program(&mut m, 5, 0x17f1, 3);
+        assert!(m.port_error.is_none());
+        let period = CYCLES_PER_SECOND * 156 / 1_000_000;
+        m.cycles += period * 2;
+        m.tick_devices();
+        assert_eq!(m.dac_out, vec![7, 8]);
+        assert!(!m.irq7_pending, "還沒傳完不能發中斷");
+        m.cycles += period;
+        m.tick_devices();
+        assert_eq!(m.dac_out, vec![7, 8, 9]);
+        assert!(m.irq7_pending && m.sb.irq_pending);
+        assert_eq!(m.dma.current[2], 0x17f4);
+        assert_eq!(m.input(0x22a), 0xaa, "先取走 reset 回覆");
+        assert_eq!(m.input(0x22e), 0);
+        assert!(!m.sb.irq_pending, "讀 22Eh 清除 DSP 中斷");
+    }
+
+    #[test]
+    fn masked_channel_pauses_transfer() {
+        let mut m = Memory::default();
+        program(&mut m, 5, 0x17f1, 1);
+        m.output(0x0a, 5);
+        m.cycles += CYCLES_PER_SECOND;
+        m.tick_devices();
+        assert!(m.dac_out.is_empty() && !m.irq7_pending);
+        m.output(0x0a, 1);
+        m.tick_devices();
+        assert_eq!(m.dac_out.len(), 1);
+        assert!(m.irq7_pending);
+    }
+
+    #[test]
+    fn pic_mask_round_trip() {
+        let mut m = Memory::default();
+        m.output(0x21, 0x7f);
+        assert_eq!(m.input(0x21), 0x7f);
+        m.output(0x20, 0x20);
+        assert!(m.port_error.is_none());
+    }
+}
+
+#[cfg(test)]
+mod mode13_tests {
+    use super::*;
+
+    #[test]
+    fn chained_reads_linear_memory_and_dac() {
+        let mut m = Memory::default();
+        m.vga.reset(0x13);
+        assert!(!m.vga.planar());
+        m.write(0xa0000 + 321, 9);
+        assert_eq!(m.ram[0xa0000 + 321], 9);
+        m.output(0x3c8, 9);
+        for c in [63, 0, 32] {
+            m.output(0x3c9, c);
+        }
+        let (w, h, rgb) = m.rgb();
+        assert_eq!((w, h), (320, 200));
+        assert_eq!(&rgb[321 * 3..322 * 3], &[255, 0, 130]);
+        assert_eq!(&rgb[0..3], &[0, 0, 0]);
+    }
+
+    #[test]
+    fn clearing_chain4_switches_to_planes() {
+        // 負對照：同一個 CPU 寫入，非鏈結時落進平面，不能出現在線性記憶體。
+        let mut m = Memory::default();
+        m.vga.reset(0x13);
+        m.output(0x3c4, 4);
+        m.output(0x3c5, 0x06);
+        assert!(m.vga.planar());
+        m.output(0x3c4, 2);
+        m.output(0x3c5, 0x02); // 只寫平面 1
+        m.write(0xa0000 + 5, 7);
+        assert_eq!(m.ram[0xa0000 + 5], 0);
+        let idx = m.vga.indexed13(&m.ram[0xa0000..0xb0000]);
+        assert_eq!(idx[5 * 4 + 1], 7, "x=21 落在平面 1 第 5 格");
+        assert_eq!(idx[5 * 4], 0);
     }
 }

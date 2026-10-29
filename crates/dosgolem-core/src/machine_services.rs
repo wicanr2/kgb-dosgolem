@@ -143,6 +143,9 @@ impl Machine {
             }
             0x3c | 0x3d => {
                 let name = self.cstring(ds, dx)?;
+                if self.file_log.len() < 4096 {
+                    self.file_log.push(FileEvent { step: self.cpu.steps, ah, name: name.clone(), result: -1 });
+                }
                 let path = self.resolve(&name, ah == 0x3c);
                 if let Ok(path) = path {
                     let mut options = OpenOptions::new();
@@ -158,15 +161,24 @@ impl Machine {
                                 .find(|h| !self.handles.contains_key(h))
                                 .ok_or("DOS handle table full")?;
                             self.handles.insert(h, file);
-                            self.cpu.r[AX] = h
+                            self.cpu.r[AX] = h;
+                            if let Some(e) = self.file_log.last_mut() {
+                                e.result = i32::from(h)
+                            }
                         }
                         Err(_) => {
                             self.fail(5);
+                            if let Some(e) = self.file_log.last_mut() {
+                                e.result = -5
+                            }
                             return Ok(());
                         }
                     }
                 } else {
                     self.fail(2);
+                    if let Some(e) = self.file_log.last_mut() {
+                        e.result = -2
+                    }
                     return Ok(());
                 }
             }
@@ -481,7 +493,7 @@ impl Machine {
     pub(super) fn video(&mut self, ah: u8, al: u8) -> Result<(), String> {
         match ah {
             0 => {
-                if !matches!(al & 0x7f, 3 | 0x0d..=0x12) {
+                if !matches!(al & 0x7f, 3 | 0x0d..=0x13) {
                     return Err(format!("unsupported video mode {al:02x}"));
                 }
                 self.bus.vga.reset(al & 0x7f);
@@ -491,6 +503,10 @@ impl Machine {
                     .set_word(0x44c, if al & 0x7f == 0x10 { 0x8000 } else { 0x1000 });
                 self.bus.set_word(0x44e, 0);
                 self.bus.ram[0x462] = 0;
+                if al & 0x7f == 0x13 {
+                    // Go bda.go SetVideoMode：320 寬，欄數 40。
+                    self.bus.set_word(0x44a, 40);
+                }
             }
             1 => self.bus.set_word(0x460, self.cpu.r[CX]),
             2 => {

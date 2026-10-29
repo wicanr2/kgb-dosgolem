@@ -24,3 +24,27 @@
 ## 缺口順序
 
 依 Go 基準的紀錄，KGB 到片頭前會用到：EMS、滑鼠 `int 33h`、mode 13h 與 DAC、PIT 重設分頻、IRQ0／IRQ1 改向、Sound Blaster DSP（220h）與 OPL（388h）、軟碟控制埠 3F2。MSCDEX 是否被查詢尚未量。每補一項重跑本對照，追加新的停點。
+
+## 停點紀錄（自有核心）
+
+| 輸出 | 停在 | 原因 | 處置 |
+|---|---|---|---|
+| rs-r1 | #398,768 `188b:3580` | `int 67h AX=4102` | 移植 EMS（docs/spec/002） |
+| rs-r2 | #473,195 `5156:0365` | 寫 226h（DSP reset） | 移植 DSP（docs/spec/003） |
+| rs-r3 | #473,237 `5156:0311` | 22Ch 寫 E0h（DSP 識別） | 依 DOSBox-X 補 E0h |
+| rs-r4 | #473,386 `5156:045d` | 寫 0Ah（8237 遮罩） | 移植 8237 狀態 |
+| rs-r6 | #473,460 `5156:0345` | DSP `14h` 要求 1 位元組 DMA | 補單次 DMA、IRQ 7、8259 IMR |
+| rs-r9 | #475,138 `188b:63b2` | 寫 3F2h 值 0Ch | 保存軟碟 DOR |
+| rs-r10 | #482,534 `51e0:0aa2` | `int 10h` 設 mode 13h | 補 mode 13h（Go setMode13、Unchained256） |
+| rs-r11 | #549,763 `50bb:096d` | 寫 225h 值 CCh（SB Pro mixer） | mixer 改為一般暫存器檔 |
+| rs-r13 | 跑滿 50,000,000 步 | 無 | 見下節 |
+
+## 自有核心 50M 步（rs-r13）
+
+- 開檔順序前 14 檔與 Go 基準相同，步數相差 23 以內（例：`KGBADP.SQX` #398,863，Go 讀取於 #398,886）。
+- 之後：#12,188,271 `CRYOMUS.SQX`、#35,602,634 `INTRO.BGF`、#35,602,729 `TCD1A.SCR`、#38,118,024 `THAT.SQX`、#38,118,143 `KURSK.SQX`。
+- 畫面：開場動畫，底部遊戲自繪英文字幕 `Maksim Mikhailovich Rukov is my real name but I use other names,`。
+- `int 33h` 只呼叫 AX=0 一次，種子回「沒有滑鼠」；Go 基準有滑鼠並持續輪詢 0003h。
+- IRQ 7 送達 1 次（SB 偵測）。
+
+兩邊進度不同的原因（強推論）：種子每次 IRQ0 間隔為 PIT 分頻 × 4 週期，50M 步約 15,700 次 tick；Go 基準同步數送 857 次。KGB 以 tick 計時，本庫的遊戲時間相對指令數快約 18 倍。另一個差異是滑鼠有無。兩者未分離量測。

@@ -10,6 +10,15 @@ use std::path::{Component, Path, PathBuf};
 #[path = "machine_services.rs"]
 mod services;
 
+/// 一次開檔：步數、AH、DOS 路徑、結果（handle，或負的 DOS 錯誤碼）。
+#[derive(Clone, Debug)]
+pub struct FileEvent {
+    pub step: u64,
+    pub ah: u8,
+    pub name: String,
+    pub result: i32,
+}
+
 #[derive(Clone)]
 struct Block {
     size: u16,
@@ -34,6 +43,9 @@ pub struct Machine {
     pub blocked: bool,
     pub services: BTreeMap<String, u64>,
     pub dos_events: Vec<Value>,
+    pub ems: crate::ems::Ems,
+    /// 開檔紀錄（AH=3Ch／3Dh），上限 4096 筆。
+    pub file_log: Vec<FileEvent>,
     blocks: BTreeMap<u16, Block>,
     parents: Vec<Parent>,
     handles: BTreeMap<u16, File>,
@@ -42,6 +54,8 @@ pub struct Machine {
     last_exit: u16,
     last_error: u16,
     irq_at: u64,
+    irq0_pending: bool,
+    pub irq7_delivered: u64,
     search: VecDeque<PathBuf>,
 }
 impl Machine {
@@ -63,6 +77,8 @@ impl Machine {
             blocked: false,
             services: BTreeMap::new(),
             dos_events: Vec::new(),
+            ems: crate::ems::Ems::new(),
+            file_log: Vec::new(),
             blocks: BTreeMap::new(),
             parents: Vec::new(),
             handles: BTreeMap::new(),
@@ -71,6 +87,8 @@ impl Machine {
             last_exit: 0,
             last_error: 0,
             irq_at: 262144,
+            irq0_pending: false,
+            irq7_delivered: 0,
             search: VecDeque::new(),
         };
         m.bus.set_word(0x410, 0x0021);
@@ -91,6 +109,7 @@ impl Machine {
         }
         m.bus.ram[0x800 + 8 * 4] = 0xcf;
         m.bus.ram[0x800 + 0x1c * 4] = 0xcf;
+        crate::ems::install(&mut m.bus);
         m.blocks.insert(
             0xcf,
             Block {
@@ -316,7 +335,13 @@ impl Machine {
         self.bus.cycles = self.cpu.cycles;
         if self.cpu.cycles >= self.irq_at {
             self.irq_at = self.cpu.cycles + u64::from(self.bus.pit_divisor) * 4;
-            if self.cpu.flag(IF) {
+            // 先掛起、等 IF 與 IMR 允許再送（Go machine.go 的 irq0Pending 語意，docs/spec/003 §4）。
+            self.irq0_pending = true;
+        }
+        self.bus.tick_devices();
+        if self.cpu.flag(IF) {
+            if self.irq0_pending && self.bus.pic_mask & 1 == 0 {
+                self.irq0_pending = false;
                 let ticks =
                     u32::from(self.bus.word(0x46c)) | (u32::from(self.bus.word(0x46e)) << 16);
                 let ticks = ticks.wrapping_add(1);
@@ -328,6 +353,13 @@ impl Machine {
                     self.cpu.interrupt(&mut self.bus, 8)
                 } else if (self.bus.word(0x1c * 4 + 2), self.bus.word(0x1c * 4)) != (0x80, 0x70) {
                     self.cpu.interrupt(&mut self.bus, 0x1c)
+                }
+            } else if self.bus.irq7_pending && self.bus.pic_mask & 0x80 == 0 {
+                self.bus.irq7_pending = false;
+                // 向量仍是 stub＝沒有程式接手，照 BIOS 預設丟棄。
+                if self.bus.word(0x0f * 4 + 2) != 0x80 {
+                    self.irq7_delivered += 1;
+                    self.cpu.interrupt(&mut self.bus, 0x0f)
                 }
             }
         }
@@ -467,6 +499,7 @@ impl Machine {
                 self.cpu.r[AX] = 0;
                 self.cpu.r[BX] = 0
             }
+            crate::ems::TRAMPOLINE => self.ems.call(&mut self.cpu, &mut self.bus),
             8 | 0x1c => {}
             _ => {
                 let (seg, _off) = (

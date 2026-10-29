@@ -20,6 +20,11 @@
 | 改動 | 理由 | 依據 |
 |---|---|---|
 | `Machine::load_with_tail` 寫 PSP 80h 命令列尾 | KGB 啟動器靠命令列尾選裝置與寫入路徑 | DOS PSP 格式（80h 長度、81h 起內容、0Dh 結尾） |
+| EMS | KGB 需要 | docs/spec/002-ems.md |
+| SB DSP、mixer、8237、單次 DMA、IRQ 7、8259 IMR、IRQ0 掛起 | KGB 偵測 SB | docs/spec/003-sound-blaster.md |
+| 軟碟 DOR 3F2h 只保存 | KGB 寫 0Ch 關馬達 | 8272 DOR 公開格式；Go 對未知埠只記錄 |
+| mode 13h 鏈結與非鏈結 | KGB 畫面模式 | Go `bda.go` SetVideoMode、`vga.go` setMode13、Unchained256 |
+| 開檔紀錄 `file_log` | 與 Go 基準比對開檔順序 | 觀測用，不改行為 |
 
 ## 驗收
 
