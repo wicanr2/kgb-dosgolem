@@ -9,8 +9,8 @@
 #   tools/rust.sh test             離線跑測試
 #   tools/rust.sh cargo <參數...>  離線執行任意 cargo 子命令（專案唯讀）
 #   tools/rust.sh kgb <輸出名> <步數> [--shots N]   接手文字 routine，輸出事件與中文覆繪截圖
-#   tools/rust.sh play [--cycles N]          在本機 X11 桌面開視窗玩（中文覆繪）
-#   tools/rust.sh gui-check <輸出名> <秒數>  Xvfb 無頭跑視窗，擷取畫面為 PNG
+#   tools/rust.sh play [--lang zh-TW|zh-CN|en] [--cycles N]   在本機 X11 桌面開視窗玩；預設語言依主機語系
+#   tools/rust.sh gui-check <輸出名> <秒數> [--lang ...]       Xvfb 無頭跑視窗，擷取畫面為 PNG
 #                                  原版 workplace/disc/cd 唯讀共用，每次執行只建可寫暫存層，
 #                                  在自有核心上跑 KGB 啟動器，輸出到 workplace/runs/<輸出名>
 #
@@ -84,15 +84,15 @@ case "$cmd" in
     test -f "$WP/play/scratch/KGB/CSP.CFG" || cp "$WP/disc/CSP.CFG" "$WP/play/scratch/KGB/"
     gpu=(); if test -c /dev/dri/renderD128; then gpu=(--device /dev/dri/renderD128 --group-add "$(stat -c %g /dev/dri/renderD128)"); fi
     auth=(); xa="${XAUTHORITY:-$HOME/.Xauthority}"; if test -f "$xa"; then auth=(-v "$xa:/tmp/xauth:ro" -e XAUTHORITY=/tmp/xauth); fi
-    tsv=(); for f in "$ROOT"/text/*.zh-TW.tsv; do test -f "$f" && tsv+=(--tsv "/text/$(basename "$f")"); done
+    # 語系變數照主機傳入，kgb-play 依此選預設語言（未設定的變數不會傳）。
     docker run --rm --init -u "$(id -u):$(id -g)" --name "dgrs-play-$$" \
       --memory 4g --cpus 4 --pids-limit 256 --network none --read-only --tmpfs /tmp:rw,exec,size=256m \
       --cap-drop ALL --security-opt no-new-privileges \
       --log-opt max-size=10m --log-opt max-file=3 \
-      -e HOME=/tmp -e DISPLAY -e WGPU_BACKEND=vulkan "${gpu[@]}" "${auth[@]}" \
+      -e HOME=/tmp -e DISPLAY -e WGPU_BACKEND=vulkan -e LANG -e LC_ALL -e LC_MESSAGES "${gpu[@]}" "${auth[@]}" \
       -v /tmp/.X11-unix:/tmp/.X11-unix:ro -v "$WP/target/release:/tool:ro" -v "$WP/disc/cd:/game:ro" \
       -v "$ROOT/text:/text:ro" -v "$font_dir:/fonts:ro" -v "$WP/play/scratch:/save" "$GUI_IMAGE" \
-      /tool/kgb-play --root /game --scratch /save --font /fonts/NotoSansCJK-Medium.ttc "${tsv[@]}" "$@"
+      /tool/kgb-play --root /game --scratch /save --text /text --font /fonts/NotoSansCJK-Medium.ttc "$@"
     ;;
   gui-check)
     # 無頭驗證視窗：Xvfb＋lavapipe，跑指定秒數後擷取畫面為 PNG。
@@ -100,13 +100,12 @@ case "$cmd" in
     test -x "$WP/target/release/kgb-play" || { echo "先跑 tools/rust.sh build" >&2; exit 1; }
     run="$WP/runs/$name"; test ! -e "$run" || { echo "$run 已存在" >&2; exit 1; }
     mkdir -p "$run/scratch/KGB" "$run/fb"; cp "$WP/disc/CSP.CFG" "$run/scratch/KGB/"
-    tsv=(); for f in "$ROOT"/text/*.zh-TW.tsv; do test -f "$f" && tsv+=(--tsv "/text/$(basename "$f")"); done
     timeout $((secs + 60)) docker run --rm --init -u "$(id -u):$(id -g)" --name "dgrs-gui-$name" \
       --memory 3g --cpus 3 --pids-limit 256 --network none --log-opt max-size=10m --log-opt max-file=3 \
       -e HOME=/tmp -e WGPU_BACKEND=vulkan -v "$WP/target/release:/tool:ro" -v "$WP/disc/cd:/game:ro" \
       -v "$ROOT/text:/text:ro" -v /usr/share/fonts/opentype/noto:/fonts:ro -v "$run:/run" "$GUI_IMAGE" \
       sh -c 'Xvfb :99 -screen 0 1000x700x24 -fbdir /run/fb >/run/xvfb.log 2>&1 & sleep 2; DISPLAY=:99 "$@" >/run/play.log 2>&1 & sleep '"$secs"'; cp /run/fb/Xvfb_screen0 /run/shot.xwd' \
-      sh /tool/kgb-play --root /game --scratch /run/scratch --font /fonts/NotoSansCJK-Medium.ttc "${tsv[@]}" "$@"
+      sh /tool/kgb-play --root /game --scratch /run/scratch --text /text --font /fonts/NotoSansCJK-Medium.ttc "$@"
     timeout 60 docker run --rm --network none --memory 512m --pids-limit 32 --log-opt max-size=10m --log-opt max-file=3 \
       -u "$(id -u):$(id -g)" -v "$run:/d" -v "$FG_ROOT/tools/py:/py:ro" --entrypoint python3 "$IMAGE" -I /py/xwd2png.py /d/shot.xwd /d/shot.png
     echo "$run/shot.png"

@@ -4,7 +4,7 @@
 use crate::catalog::{Catalog, key_of};
 use crate::lifecycle::Screen;
 use crate::overlay::{self, Glyphs, Item};
-use crate::takeover::Takeover;
+use crate::takeover::{Takeover, TextEvent};
 use ferrogolem_core::machine::Machine;
 use std::fmt::Write as _;
 use std::path::Path;
@@ -55,14 +55,7 @@ impl Session {
                     e.step, e.kind, e.site, e.x, e.y, e.max_lines, e.line_height, e.color,
                     u8::from(zh.is_some()), key_of(&e.text), u8::from(e.taken)
                 );
-                // 未譯時以英文畫在覆繪層；原版 86e9 只畫前 max_lines 行，退路照做。
-                let shown = zh.map_or_else(
-                    || {
-                        let s = String::from_utf8_lossy(&e.text);
-                        s.split('^').take(usize::from(e.max_lines.max(1))).collect::<Vec<_>>().join("\n")
-                    },
-                    str::to_string,
-                );
+                let shown = shown(&self.catalog, &e);
                 let taken = e.taken;
                 if taken && !e.text.is_empty() {
                     self.screen.on_event(Item { event: e, zh: shown });
@@ -80,6 +73,21 @@ impl Session {
         Ok(())
     }
 
+    /// 換譯文表：顯示中的項目改用新表的譯文。`passthrough` 為真時是英文原版，
+    /// 之後不再跳過原版繪字，並清掉覆繪項目（被跳過的英文要等原版下次重畫才出現）。
+    /// 回傳換下來的舊表。
+    pub fn set_text(&mut self, catalog: Catalog, passthrough: bool) -> Catalog {
+        let old = std::mem::replace(&mut self.catalog, catalog);
+        self.take.passthrough = passthrough;
+        if passthrough {
+            self.screen.clear();
+        } else {
+            let c = &self.catalog;
+            self.screen.retranslate(|item| shown(c, &item.event));
+        }
+        old
+    }
+
     /// 原版 320×200 時合成 3 倍中文覆繪，其他模式原樣回傳。
     pub fn compose(&self, glyphs: Option<&mut Glyphs>) -> (usize, usize, Vec<u8>) {
         let (w, h, rgb) = self.m.bus.rgb();
@@ -91,6 +99,18 @@ impl Session {
             _ => (w, h, rgb),
         }
     }
+}
+
+/// 覆繪要顯示的文字：有譯文用譯文，原文換行 `^` 在譯文裡同樣換行；未譯時以英文畫在覆繪層，
+/// 原版 86e9 只畫前 max_lines 行，退路照做。
+fn shown(catalog: &Catalog, e: &TextEvent) -> String {
+    catalog.get(&e.text).map(|zh| zh.replace('^', "\n")).map_or_else(
+        || {
+            let s = String::from_utf8_lossy(&e.text);
+            s.split('^').take(usize::from(e.max_lines.max(1))).collect::<Vec<_>>().join("\n")
+        },
+        |zh| zh,
+    )
 }
 
 /// 讀譯文表與字型，並檢查譯文用到的每個字字型都有。

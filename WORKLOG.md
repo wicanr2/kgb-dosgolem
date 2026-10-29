@@ -34,3 +34,8 @@
 - 使用者定譯文用語：兩岸共同用語（大陸夥伴需求），字形繁體；寫 `text/TRANSLATING.md` 與擴充譯名表（俄語專名依新華社）。開場譯文改「秘密」「塔吉克斯坦」。
 - 第一章 3,999 句切成 31 批（workplace/translate），寫 `tools/merge_translations.py` 逐列驗證；派 1 個 sonnet 子代理試作第 1 批。
 - 使用者改定：繁中用台灣用語、簡中用大陸用語，簡中由 OpenCC tw2sp＋譯名表簡中欄轉換；工具列可選繁中、簡中、英文原版，預設依系統語系。譯名表改為四欄 `text/glossary.tsv`，翻譯指引改為台灣用語；試作風格經使用者確認。
+- 第一章翻譯完成：第 2 到 29 批由 sonnet 子代理分三波翻譯，每波後統一譯名並補譯名表（扎娜、奇茲霍娃、沙卡洛夫、姓氏複數「某某一家」等），Spetsnaz 首次出現附原文。合併 3,299 個不重複 key，略過 228 個 `bugbugbug.`；同 key 不同譯 14 組取第一個，其中「借個火」「米·謝·戈巴契夫」「為什麼」改為定稿。第 19、23 批子代理違反「不執行程式」的邊界，跑了唯讀的 wc／awk／grep，沒有寫入其他檔。
+- 章節片語的譯文表改以 FNV-1a 64 雜湊當 key（`fnv64:`），英文原文只留在 workplace，不進版控（AGENTS.md §8）。`Catalog` 查找一律換算雜湊，原文寫法的 key 仍可用；Rust 與 Python 實作都對過標準測試向量。
+- 新增 `kgb-zhcn`，產生 `text/*.zh-CN.tsv`；tw2sp 未轉的「想像」以譯名表覆寫成「想象」。
+- 語言選單：`lang.rs` 依 LC_ALL、LC_MESSAGES、LANG 決定預設語言；FerroGolem 前端加 `Guest::toolbar`，kgb-play 在工具列切換繁中、简中、英文原版；英文原版設 `Takeover::passthrough`，原版照畫。Xvfb 驗證：簡中字幕與 SC 字形（gui-cn1）、英文原版（gui-en1）。執行中點選切換尚未以 GUI 操作驗證。
+- 用 cycles 1000 跑 1.0B 步進入第一章（ch1-zh3）：51 個文字事件，接手的 50 個全部有譯文（開場 47、章節標題 1d97、地點 52a0、旁白 584f），時鐘 86b3 照原版畫。譯文的 `^` 改為換行顯示。章節標題另立 `text/chapters.zh-TW.tsv`，來源檔尚未取證。

@@ -75,6 +75,18 @@ impl Screen {
         self.removed += removed;
     }
 
+    /// 換語言時重算顯示中項目的文字；生命週期狀態不變。
+    pub fn retranslate(&mut self, f: impl Fn(&Item) -> String) {
+        for l in &mut self.live {
+            l.item.zh = f(&l.item);
+        }
+    }
+
+    /// 清掉所有顯示中的項目（切到英文原版時用）。
+    pub fn clear(&mut self) {
+        self.live.clear();
+    }
+
     pub fn items(&self) -> Vec<Item> {
         self.live.iter().map(|l| l.item.clone()).collect()
     }

@@ -11,10 +11,11 @@ tools/rust.sh fetch                  # 產生 Cargo.lock 並抓依賴，唯一�
 tools/rust.sh build                  # 離線 release 建置，產物在 workplace/target/release/
 tools/rust.sh test [測試名]          # 離線測試；單一測試照 cargo test 傳名稱
 tools/rust.sh kgb <輸出名> <步數> [--shots N]   # 接手文字 routine 跑 KGB，輸出 events.tsv 與 3 倍中文覆繪截圖
-tools/rust.sh play [--cycles N]       # 在本機 X11 桌面開視窗玩，存檔在 workplace/play/scratch
+tools/rust.sh play [--lang zh-TW|zh-CN|en] [--cycles N]   # 在本機 X11 桌面開視窗玩，存檔在 workplace/play/scratch
 tools/rust.sh gui-check <輸出名> <秒數>  # Xvfb＋lavapipe 無頭跑視窗，擷取 PNG
 ```
 
+- 簡中譯文表：`kgb-zhcn <text 目錄>` 從 `text/*.zh-TW.tsv` 重產 `*.zh-CN.tsv`，`--check` 只比對（在容器內執行 `workplace/target/release/kgb-zhcn`）。改繁中譯文或譯名表後必須重產。
 - 光碟解包：`tools/extract_disc.py`，指令見 `docs/re/001-disc-inventory.md`。
 - 未完成項：`python3 -I tools/worklist.py verify /project`（容器內，專案唯讀掛在 `/project`），`selftest` 驗檢查器本身。
 - 通用探針（傾印、讀取監看、截圖）用 FerroGolem 的 `tools/rust.sh probe`。

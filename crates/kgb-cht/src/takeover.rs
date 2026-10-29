@@ -49,6 +49,8 @@ pub struct TextEvent {
 pub struct Takeover {
     /// 簽章不符的次數（偏移, 次數）。不符時不攔截。
     pub mismatches: Vec<(u16, u64)>,
+    /// 英文原版：只記錄事件，不跳過原版繪字（AGENTS.md §1「語言選單」）。
+    pub passthrough: bool,
 }
 
 fn byte(m: &Machine, seg: u16, off: u16) -> u8 {
@@ -112,7 +114,7 @@ impl Takeover {
                 line_height: word(m, ds, 0x7691),
                 color: byte(m, ds, 0x440e),
                 font_seg: word(m, ds, 0x768f),
-                taken: TAKEN_SITES.contains(&site),
+                taken: !self.passthrough && TAKEN_SITES.contains(&site),
             }
         } else {
             if site == BLOCK_INNER_RETURN || !self.signature_ok(m, cs, ip, &LINE_SIG) {
@@ -129,7 +131,7 @@ impl Takeover {
                 text.push(b);
             };
             let color = byte(m, ds, 0x440e);
-            let taken = TAKEN_SITES.contains(&site);
+            let taken = !self.passthrough && TAKEN_SITES.contains(&site);
             if taken {
             // 87d8 的輸出：DI＝結尾字元之後、CX＝輸入 BX、DH＝[440e]、AL＝結尾字元（docs/spec/004 §2）。
             m.cpu.r[DI] = p;

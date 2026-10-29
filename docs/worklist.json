@@ -41,18 +41,14 @@
    }
   },
   {
-   "id": "chapter1-translation",
+   "id": "chapter1-review",
    "layer": "kgb",
-   "title": "第一章片語翻譯（3,999 句）",
-   "body": "已以遊戲解碼器萃取第一章 U 組全部片語（docs/re/004），約 16 萬字元。尚無譯文。",
-   "acceptance": "text/chapter1.zh-TW.tsv 涵蓋全部非空片語，術語表一致，字型無缺字。",
+   "title": "第一章譯文實機校對",
+   "body": "text/chapter1.zh-TW.tsv 已涵蓋 CHAP1U 全部非空片語（3,299 個不重複 key，略過 228 個開發佔位 bugbugbug.）。譯者標記的疑點集中在：動詞選單的通用代名詞 him（3380–3413、3502–3541）、數量與物品插槽的殘句（3294–3298、3394–3399、3881–3892、3996）、冠詞 the／an（3420、3421）、被 # 截斷的句子、無上下文的短答句（同 key 多處共用一個譯文，14 組）。前三類取決於 composite-blocks 的組句方式。",
+   "acceptance": "實機走過第一章主要場景，疑點逐條定案；殘句與插槽依 composite-blocks 規格改寫。",
    "verify": {
-    "kind": "absent",
-    "paths": [
-     "text"
-    ],
-    "pattern": "Your first day at Department P",
-    "note": "譯文表出現第 460 號片語即視為已開始"
+    "kind": "manual",
+    "note": "校對完成後改綁實機事件收據"
    }
   },
   {

@@ -1,18 +1,49 @@
 // SPDX-License-Identifier: LicenseRef-RRSAL-1.0
 //! 在 FerroGolem 視窗中玩 KGB：接手文字 routine，中文畫在 3 倍覆繪層。
+//! 工具列可切換繁中、簡中、英文原版；預設依系統語系（kgb_cht::lang）。
 //!
 //! kgb-play --root <原版唯讀> --scratch <暫存層，需含 KGB\CSP.CFG>
-//!          [--cycles 20000] [--tsv <譯文表>]... --font <ttc> [--font-index 3]
+//!          --text <譯文目錄> --font <Noto Sans CJK ttc> [--lang zh-TW|zh-CN|en] [--cycles 20000]
+//!
+//! 譯文目錄下的 `*.zh-TW.tsv` 給繁中、`*.zh-CN.tsv` 給簡中；字型取 TTC 的 TC（3）與 SC（2）。
 use ferrogolem_core::machine::DEFAULT_IPS;
 use ferrogolem_core::mouse::x_scale;
-use ferrogolem_frontend::{Guest, UiFont, run};
+use ferrogolem_frontend::{Guest, UiFont, egui, run};
+use kgb_cht::catalog::Catalog;
+use kgb_cht::lang::Lang;
 use kgb_cht::overlay::Glyphs;
 use kgb_cht::session::{Session, load_text};
-use std::{path::PathBuf, process::ExitCode};
+use std::{path::Path, path::PathBuf, process::ExitCode};
+
+/// 一種中文的譯文表與字型。
+struct Text {
+    lang: Lang,
+    catalog: Option<Catalog>,
+    glyphs: Glyphs,
+}
 
 struct Kgb {
     s: Session,
-    glyphs: Option<Glyphs>,
+    lang: Lang,
+    /// 各中文版本；目前語言的譯文表在 Session 裡，這裡留空。
+    texts: Vec<Text>,
+}
+
+impl Kgb {
+    fn switch(&mut self, to: Lang) {
+        if to == self.lang {
+            return;
+        }
+        let incoming = match self.texts.iter_mut().find(|t| t.lang == to) {
+            Some(t) => t.catalog.take().unwrap_or_default(),
+            None => Catalog::default(),
+        };
+        let old = self.s.set_text(incoming, to == Lang::En);
+        if let Some(t) = self.texts.iter_mut().find(|t| t.lang == self.lang) {
+            t.catalog = Some(old);
+        }
+        self.lang = to;
+    }
 }
 
 impl Guest for Kgb {
@@ -22,7 +53,9 @@ impl Guest for Kgb {
         if self.s.m.exited { Err("遊戲已結束".into()) } else { Ok(()) }
     }
     fn frame(&mut self) -> (usize, usize, Vec<u8>) {
-        self.s.compose(self.glyphs.as_mut())
+        let lang = self.lang;
+        let glyphs = self.texts.iter_mut().find(|t| t.lang == lang).map(|t| &mut t.glyphs);
+        self.s.compose(glyphs)
     }
     fn key(&mut self, scan: u8, ascii: u8, down: bool) {
         self.s.m.key(scan, ascii, down)
@@ -39,35 +72,68 @@ impl Guest for Kgb {
     }
     fn status(&self) -> String {
         format!(
-            "KGB  虛擬 {:.1} 秒  文字 {}／譯 {}",
+            "虛擬 {:.1} 秒  文字 {}／譯 {}",
             self.s.m.cpu.steps as f64 / self.s.m.ips as f64,
             self.s.events,
             self.s.translated
         )
     }
+    fn toolbar(&mut self, ui: &mut egui::Ui) {
+        ui.separator();
+        for l in Lang::ALL {
+            if ui.selectable_label(self.lang == l, l.label()).clicked() {
+                self.switch(l);
+            }
+        }
+        ui.separator();
+    }
+}
+
+/// 譯文目錄下某語言的全部譯文表，依檔名排序。
+fn catalogs_for(dir: &Path, tag: &str) -> Result<Vec<PathBuf>, String> {
+    let suffix = format!(".{tag}.tsv");
+    let mut v: Vec<PathBuf> = std::fs::read_dir(dir)
+        .map_err(|e| format!("{}：{e}", dir.display()))?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.ends_with(&suffix)))
+        .collect();
+    v.sort();
+    Ok(v)
 }
 
 fn main_inner() -> Result<(), String> {
     let mut it = std::env::args().skip(1);
     let (mut root, mut scratch, mut cycles) = (None, None, DEFAULT_IPS / 1000);
-    let (mut tsv, mut font, mut font_index) = (Vec::new(), None, 3u32);
+    let (mut text, mut font, mut lang) = (None, None, None);
     while let Some(k) = it.next() {
         let mut v = || it.next().ok_or(format!("{k} 需要值"));
         match k.as_str() {
             "--root" => root = Some(PathBuf::from(v()?)),
             "--scratch" => scratch = Some(PathBuf::from(v()?)),
             "--cycles" => cycles = v()?.parse().map_err(|e| format!("--cycles：{e}"))?,
-            "--tsv" => tsv.push(PathBuf::from(v()?)),
+            "--text" => text = Some(PathBuf::from(v()?)),
             "--font" => font = Some(PathBuf::from(v()?)),
-            "--font-index" => font_index = v()?.parse().map_err(|e| format!("--font-index：{e}"))?,
+            "--lang" => {
+                let s = v()?;
+                lang = Some(Lang::parse(&s).ok_or(format!("--lang 只接受 zh-TW、zh-CN、en，收到 {s}"))?);
+            }
             _ => return Err(format!("未知參數 {k}")),
         }
     }
-    let font = font.ok_or("缺 --font")?;
-    let (catalog, glyphs) = load_text(&tsv, Some(&font), font_index)?;
-    let s = Session::new(&root.ok_or("缺 --root")?, &scratch.ok_or("缺 --scratch")?, cycles * 1000, catalog)?;
-    let ui = UiFont { bytes: std::fs::read(&font).map_err(|e| e.to_string())?, index: font_index };
-    run("KGB 繁體中文版（FerroGolem）", [960.0, 640.0], Some(ui), Box::new(Kgb { s, glyphs }))
+    let (text, font) = (text.ok_or("缺 --text")?, font.ok_or("缺 --font")?);
+    let lang = lang.unwrap_or_else(|| Lang::from_env(|k| std::env::var(k).ok()));
+    let mut texts = Vec::new();
+    for l in Lang::ALL {
+        let (Some(tag), Some(index)) = (l.tag(), l.font_index()) else { continue };
+        let (catalog, glyphs) = load_text(&catalogs_for(&text, tag)?, Some(&font), index)?;
+        texts.push(Text { lang: l, catalog: Some(catalog), glyphs: glyphs.ok_or("字型未載入")? });
+    }
+    let start = texts.iter_mut().find(|t| t.lang == lang).and_then(|t| t.catalog.take()).unwrap_or_default();
+    let mut s = Session::new(&root.ok_or("缺 --root")?, &scratch.ok_or("缺 --scratch")?, cycles * 1000, start)?;
+    s.take.passthrough = lang == Lang::En;
+    // 介面字用 TC；Noto Sans CJK 每個 collection 都含繁簡字形，「简中」照樣顯示。
+    let ui = UiFont { bytes: std::fs::read(&font).map_err(|e| e.to_string())?, index: 3 };
+    run("KGB 中文版（FerroGolem）", [960.0, 660.0], Some(ui), Box::new(Kgb { s, lang, texts }))
 }
 
 fn main() -> ExitCode {
