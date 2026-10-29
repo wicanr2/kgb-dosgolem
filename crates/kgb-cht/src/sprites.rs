@@ -73,23 +73,77 @@ pub struct Sprites {
     menus: Vec<Placed>,
     /// 最近一次畫游標：（步數, x, y, 圖塊編號）。
     cursor: Option<(u64, i32, i32, u16)>,
+    /// 開場字卡標籤（docs/spec/005 §5）。
+    cards: Vec<Card>,
+    /// 顯示中的字卡：（標籤索引, 是否已上屏, 最後一次寫入的步數）。
+    card: Option<(usize, bool, u64)>,
     /// 簡中（否則繁中）。
     pub simplified: bool,
 }
+
+/// 字卡標籤表的一列：檔名與蓋住英文字的矩形（原版 320×200 座標）。
+#[derive(Clone, Debug, PartialEq)]
+pub struct Card {
+    pub file: String,
+    pub x: i32,
+    pub y: i32,
+    pub w: i32,
+    pub h: i32,
+    pub en: String,
+    pub zh_tw: String,
+    pub zh_cn: String,
+}
+
+/// 讀 `text/card-labels.tsv`：八欄 檔名、x、y、寬、高、英文、繁中、簡中。
+pub fn parse_cards(tsv: &str) -> Result<Vec<Card>, String> {
+    let mut out = Vec::new();
+    for (n, line) in tsv.lines().enumerate() {
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let c: Vec<&str> = line.split('\t').collect();
+        if c.len() != 8 {
+            return Err(format!("字卡表第 {} 行欄數 {}，應為 8", n + 1, c.len()));
+        }
+        let num = |s: &str| s.parse::<i32>().map_err(|e| format!("字卡表第 {} 行：{e}", n + 1));
+        out.push(Card {
+            file: c[0].to_ascii_uppercase(),
+            x: num(c[1])?,
+            y: num(c[2])?,
+            w: num(c[3])?,
+            h: num(c[4])?,
+            en: c[5].into(),
+            zh_tw: c[6].into(),
+            zh_cn: c[7].into(),
+        });
+    }
+    Ok(out)
+}
+
+/// 相鄰寫入相差超過此步數視為新的一波（同 lifecycle::BURST_GAP）。
+const CARD_GAP: u64 = crate::lifecycle::BURST_GAP;
 
 fn signature(m: &Machine, cs: u16, ip: u16, sig: &[u8]) -> bool {
     sig.iter().enumerate().all(|(i, &b)| m.bus.ram[Cpu::address(cs, ip.wrapping_add(i as u16))] == b)
 }
 
-/// 矩形內最常見與次常見的色號（底色、字色）。
-pub fn bg_fg(px: &[u8]) -> (u8, u8) {
+/// 矩形的底色與字色（色號）：底色為最常見的色號；字色從數量達非底色最多者 20% 的色號中，
+/// 取與底色亮度差最大的一個（原版字有多階陰影，次常見的常是暗邊，ex-card4）。
+pub fn bg_fg(px: &[u8], dac: &[[u8; 3]; 256]) -> (u8, u8) {
     let mut n = [0usize; 256];
     for &p in px {
         n[usize::from(p)] += 1;
     }
-    let bg = (0..256).max_by_key(|&i| n[i]).unwrap_or(0) as u8;
-    let fg = (0..256).filter(|&i| i != usize::from(bg)).max_by_key(|&i| n[i]).filter(|&i| n[i] > 0);
-    (bg, fg.map_or(bg ^ 0xff, |i| i as u8))
+    let bg = (0..256).max_by_key(|&i| n[i]).unwrap_or(0);
+    let luma = |i: usize| {
+        let [r, g, b] = dac[i];
+        u32::from(r) * 299 + u32::from(g) * 587 + u32::from(b) * 114
+    };
+    let top = (0..256).filter(|&i| i != bg).map(|i| n[i]).max().unwrap_or(0);
+    let fg = (0..256)
+        .filter(|&i| i != bg && n[i] > 0 && n[i] * 10 >= top)
+        .max_by_key(|&i| luma(i).abs_diff(luma(bg)));
+    (bg as u8, fg.map_or(bg as u8 ^ 0xff, |i| i as u8))
 }
 
 /// 快照與目前畫面相同的比例是否達標。
@@ -114,6 +168,37 @@ fn rect(plane: &[u8], x: i32, y: i32, w: u16, h: u16) -> Vec<u8> {
 impl Sprites {
     pub fn new(labels: Vec<Label>) -> Self {
         Self { labels, ..Self::default() }
+    }
+
+    pub fn set_cards(&mut self, cards: Vec<Card>) {
+        self.cards = cards;
+    }
+
+    /// 程式開檔（DOS 3Dh）。檔名是表上的字卡時開始等它上屏。
+    pub fn on_open(&mut self, name: &str) {
+        let base = name.rsplit(['\\', '/', ':']).next().unwrap_or(name).to_ascii_uppercase();
+        if let Some(i) = self.cards.iter().position(|c| c.file == base) {
+            self.card = Some((i, false, 0));
+        }
+    }
+
+    /// 一步之內對 A0000 的寫入：第一波寫到字卡矩形算上屏，之後新的一波就移除。
+    pub fn on_writes(&mut self, step: u64, hits: &[usize]) {
+        let Some((i, committed, last)) = self.card else { return };
+        let c = &self.cards[i];
+        let touched = hits.iter().any(|&a| {
+            let off = a.wrapping_sub(0xa0000);
+            let (x, y) = ((off % 320) as i32, (off / 320) as i32);
+            off < 64000 && (c.x..c.x + c.w).contains(&x) && (c.y..c.y + c.h).contains(&y)
+        });
+        if !touched {
+            return;
+        }
+        if committed && step > last + CARD_GAP {
+            self.card = None;
+        } else {
+            self.card = Some((i, true, step));
+        }
     }
 
     fn has(&self, sprite: u16) -> bool {
@@ -160,8 +245,9 @@ impl Sprites {
             if !snap.iter().zip(&now).all(|(s, n)| matches(s, n)) {
                 return false;
             }
-            for (l, s) in ls.iter().zip(snap) {
-                let (bg, fg) = bg_fg(s);
+            // 同一個選單共用一組底色與字色，各按鈕的字色才一致（ex-spr4）。
+            let (bg, fg) = bg_fg(&snap.concat(), dac);
+            for l in &ls {
                 out.push(Patch {
                     x: p.x + i32::from(l.x),
                     y: p.y + i32::from(l.y),
@@ -174,11 +260,17 @@ impl Sprites {
             }
             true
         });
+        if let Some((i, true, _)) = self.card {
+            let c = &self.cards[i];
+            let (bg, fg) = bg_fg(&rect(indexed, c.x, c.y, c.w as u16, c.h as u16), dac);
+            let text = if simplified { c.zh_cn.clone() } else { c.zh_tw.clone() };
+            out.push(Patch { x: c.x, y: c.y, w: c.w, h: c.h, bg: dac[usize::from(bg)], fg: dac[usize::from(fg)], text });
+        }
         if let Some((at, x, y, sprite)) = self.cursor {
             if step.saturating_sub(at) <= ips / 10 && sprite >> 8 == 0 {
                 for l in labels.iter().filter(|l| l.sprite == sprite && (1..=11).contains(&sprite)) {
                     let (lx, ly) = (x + i32::from(l.x), y + i32::from(l.y));
-                    let (bg, fg) = bg_fg(&rect(indexed, lx, ly, l.w, l.h));
+                    let (bg, fg) = bg_fg(&rect(indexed, lx, ly, l.w, l.h), dac);
                     out.push(Patch { x: lx, y: ly, w: i32::from(l.w), h: i32::from(l.h), bg: dac[usize::from(bg)], fg: dac[usize::from(fg)], text: text(l) });
                 }
             }
@@ -199,6 +291,25 @@ mod tests {
     }
 
     #[test]
+    fn card_commits_on_first_burst_and_leaves_on_the_next() {
+        let mut s = Sprites::default();
+        s.set_cards(parse_cards("TCD1A.SCR\t28\t84\t264\t24\tMoscow\t莫斯科\t莫斯科\n").unwrap());
+        let inside = [0xa0000 + 90 * 320 + 100];
+        s.on_writes(10, &inside);
+        assert!(s.card.is_none(), "沒開檔前的寫入不算");
+        s.on_open("D:\\TCD1A.SCR");
+        s.on_writes(100, &[0xa0000]);
+        assert_eq!(s.card, Some((0, false, 0)), "矩形外的寫入不算上屏");
+        s.on_writes(200, &inside);
+        s.on_writes(250, &inside);
+        assert_eq!(s.card, Some((0, true, 250)), "同一波仍在");
+        s.on_writes(250 + CARD_GAP + 1, &inside);
+        assert!(s.card.is_none(), "新的一波（影片）蓋掉字卡");
+        s.on_open("TCD9A.SCR");
+        assert!(s.card.is_none(), "表上沒有的檔不理");
+    }
+
+    #[test]
     fn snapshot_match_tolerates_small_changes() {
         let snap = vec![1u8; 100];
         let mut now = snap.clone();
@@ -211,11 +322,16 @@ mod tests {
     }
 
     #[test]
-    fn background_and_text_colors_are_the_two_most_common() {
-        let mut px = vec![5u8; 60];
+    fn text_color_is_the_frequent_color_with_most_contrast() {
+        let mut dac = [[0u8; 3]; 256];
+        dac[7] = [80, 40, 10]; // 暗邊
+        dac[9] = [240, 160, 80]; // 亮字
+        dac[11] = [255, 255, 255]; // 零星雜點
+        let mut px = vec![0u8; 60];
         px.extend([7u8; 30]);
         px.extend([9u8; 10]);
-        assert_eq!(bg_fg(&px), (5, 7));
-        assert_eq!(bg_fg(&[3, 3, 3]), (3, 3 ^ 0xff), "只有一色時字色取反");
+        px.push(11);
+        assert_eq!(bg_fg(&px, &dac), (0, 9), "取亮字，不取數量較多的暗邊，也不取零星雜點");
+        assert_eq!(bg_fg(&[3, 3, 3], &dac), (3, 3 ^ 0xff), "只有一色時字色取反");
     }
 }

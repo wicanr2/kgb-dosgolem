@@ -27,6 +27,8 @@ pub struct Session {
     /// 片語解碼器 `53d8` 的呼叫紀錄（TSV，含表頭），只觀測、不改狀態；`None` 時不記。
     /// 取證多片語區塊用（worklist composite-blocks）。
     pub phrase_log: Option<String>,
+    /// 已處理的開檔紀錄筆數（字卡用）。
+    files_seen: usize,
     /// 圖塊文字覆繪（docs/spec/005）。
     pub sprites: Sprites,
     /// 取證用：從某步數起，依寫入指令的 CS:IP 彙整畫面寫入（次數、首次步數、位址範圍）。
@@ -72,6 +74,7 @@ impl Session {
             events: 0,
             translated: 0,
             phrase_log: None,
+            files_seen: 0,
             sprites: Sprites::default(),
             writers: None,
             driver_log: None,
@@ -142,7 +145,16 @@ impl Session {
                 }
             }
             self.m.step()?;
+            if self.m.file_log.len() != self.files_seen {
+                for e in &self.m.file_log[self.files_seen.min(self.m.file_log.len())..] {
+                    if e.ah == 0x3d && e.result >= 0 {
+                        self.sprites.on_open(&e.name);
+                    }
+                }
+                self.files_seen = self.m.file_log.len();
+            }
             if !self.m.bus.write_hits.is_empty() {
+                self.sprites.on_writes(self.m.cpu.steps, &self.m.bus.write_hits);
                 if let Some((from, map)) = &mut self.writers {
                     if self.m.cpu.steps >= *from {
                         let e = map.entry(self.m.cpu.start).or_insert((0, self.m.cpu.steps, usize::MAX, 0));

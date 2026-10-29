@@ -134,6 +134,9 @@ fn main_inner() -> Result<(), String> {
         s.sprites = kgb_cht::sprites::Sprites::new(kgb_cht::sprites::parse_labels(&tsv)?);
         s.sprites.simplified = lang == Lang::ZhCn;
     }
+    if let Ok(tsv) = std::fs::read_to_string(text.join("card-labels.tsv")) {
+        s.sprites.set_cards(kgb_cht::sprites::parse_cards(&tsv)?);
+    }
     // 介面字用 TC；Noto Sans CJK 每個 collection 都含繁簡字形，「简中」照樣顯示。
     let ui = UiFont { bytes: std::fs::read(&font).map_err(|e| e.to_string())?, index: 3 };
     run("KGB 中文版（FerroGolem）", [960.0, 660.0], Some(ui), Box::new(Kgb { s, lang, texts }))

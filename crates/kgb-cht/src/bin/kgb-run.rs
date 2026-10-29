@@ -143,6 +143,9 @@ fn run(a: Args) -> Result<bool, String> {
         let tsv = fs::read_to_string(p).map_err(|e| format!("{}：{e}", p.display()))?;
         s.sprites = kgb_cht::sprites::Sprites::new(kgb_cht::sprites::parse_labels(&tsv)?);
         s.sprites.simplified = a.simplified;
+        if let Ok(cards) = fs::read_to_string(p.with_file_name("card-labels.tsv")) {
+            s.sprites.set_cards(kgb_cht::sprites::parse_cards(&cards)?);
+        }
     }
     if !a.trace_at.is_empty() {
         s.trace_at = Some((a.trace_at.clone(), String::from("step\tat\tret\tregs\n")));
