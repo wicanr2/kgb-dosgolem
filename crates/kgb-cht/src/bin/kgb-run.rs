@@ -205,7 +205,7 @@ fn run(a: Args) -> Result<bool, String> {
         s.driver_log = Some((from, String::from("step\tentry\tcaller\tregs\n")));
     }
     if a.watch.is_some() {
-        s.m.bus.write_watch = a.watch;
+        s.watch = a.watch;
     }
     if let Some(from) = a.trace_writers {
         s.writers = Some((from, Default::default()));

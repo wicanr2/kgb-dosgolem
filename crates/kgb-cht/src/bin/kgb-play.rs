@@ -10,7 +10,8 @@
 //! 同目錄的 `sprite-labels.tsv` 是圖塊文字標籤表（docs/spec/005）。
 use ferrogolem_core::audio::Mixer;
 use ferrogolem_core::machine::DEFAULT_IPS;
-use ferrogolem_frontend::{Guest, UiFont, egui, run};
+use ferrogolem_core::memory::CYCLES_PER_SECOND;
+use ferrogolem_frontend::{Guest, Speed, UiFont, egui, run};
 use kgb_cht::catalog::Catalog;
 use kgb_cht::lang::Lang;
 use kgb_cht::overlay::Glyphs;
@@ -72,10 +73,13 @@ impl Guest for Kgb {
     fn ips(&self) -> u64 {
         self.s.m.ips
     }
+    fn set_ips(&mut self, ips: u64) {
+        self.s.m.ips = ips;
+    }
     fn status(&self) -> String {
         format!(
             "虛擬 {:.1} 秒  文字 {}／譯 {}",
-            self.s.m.cpu.steps as f64 / self.s.m.ips as f64,
+            self.s.m.bus.cycles as f64 / CYCLES_PER_SECOND as f64,
             self.s.events,
             self.s.translated
         )
@@ -108,14 +112,14 @@ fn catalogs_for(dir: &Path, tag: &str) -> Result<Vec<PathBuf>, String> {
 
 fn main_inner() -> Result<(), String> {
     let mut it = std::env::args().skip(1);
-    let (mut root, mut scratch, mut cycles) = (None, None, DEFAULT_IPS / 1000);
+    let (mut root, mut scratch, mut cycles) = (None, None, None::<u64>);
     let (mut text, mut font, mut lang) = (None, None, None);
     while let Some(k) = it.next() {
         let mut v = || it.next().ok_or(format!("{k} 需要值"));
         match k.as_str() {
             "--root" => root = Some(PathBuf::from(v()?)),
             "--scratch" => scratch = Some(PathBuf::from(v()?)),
-            "--cycles" => cycles = v()?.parse().map_err(|e| format!("--cycles：{e}"))?,
+            "--cycles" => cycles = Some(v()?.parse().map_err(|e| format!("--cycles：{e}"))?),
             "--text" => text = Some(PathBuf::from(v()?)),
             "--font" => font = Some(PathBuf::from(v()?)),
             "--lang" => {
@@ -147,7 +151,8 @@ fn main_inner() -> Result<(), String> {
         texts.push(Text { lang: l, catalog: Some(catalog), glyphs: glyphs.ok_or("字型未載入")? });
     }
     let start = texts.iter_mut().find(|t| t.lang == lang).and_then(|t| t.catalog.take()).unwrap_or_default();
-    let mut s = Session::new(&root.ok_or("缺 --root")?, &scratch.ok_or("缺 --scratch")?, cycles * 1000, start)?;
+    let scratch = scratch.ok_or("缺 --scratch")?;
+    let mut s = Session::new(&root.ok_or("缺 --root")?, &scratch, cycles.map_or(DEFAULT_IPS, |c| c * 1000), start)?;
     s.take.passthrough = lang == Lang::En;
     // 圖塊文字標籤表（docs/spec/005）；沒有這個檔就不畫圖塊譯文。
     if let Ok(tsv) = std::fs::read_to_string(text.join("sprite-labels.tsv")) {
@@ -159,7 +164,11 @@ fn main_inner() -> Result<(), String> {
     }
     // 介面字用 TC；Noto Sans CJK 每個 collection 都含繁簡字形，「简中」照樣顯示。
     let ui = UiFont { bytes: std::fs::read(&font).map_err(|e| e.to_string())?, index: 3 };
-    run("KGB 陰謀（FerroGolem）", [960.0, 660.0], Some(ui), Box::new(Kgb { s, lang, texts, mixer: Mixer::new() }))
+    // 時脈（FerroGolem docs/spec/006「時脈與快轉」）：--cycles 給了就固定、不寫設定檔；
+    // 否則沿用存檔目錄旁的 frontend.cfg，沒有時用自動。
+    let settings = scratch.parent().map(|p| p.join("frontend.cfg"));
+    let speed = cycles.map(|c| Speed::Fixed(c * 1000));
+    run("KGB 陰謀（FerroGolem）", [960.0, 660.0], Some(ui), settings, speed, Box::new(Kgb { s, lang, texts, mixer: Mixer::new() }))
 }
 
 fn main() -> ExitCode {

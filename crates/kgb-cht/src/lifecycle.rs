@@ -90,6 +90,11 @@ impl Screen {
         self.live.clear();
     }
 
+    /// 沒有顯示中的項目時，畫面寫入不會改變任何狀態。
+    pub fn is_empty(&self) -> bool {
+        self.live.is_empty()
+    }
+
     pub fn items(&self) -> Vec<Item> {
         self.live.iter().map(|l| l.item.clone()).collect()
     }

@@ -17,6 +17,9 @@ pub const TAIL: &str = " AMR ADP220 SBP2227 EMS 386 SAF WRIC:\\KGB\\";
 
 pub struct Session {
     pub m: Machine,
+    /// 畫面寫入監看的範圍（預設 mode 13h 畫面，生命週期依此判斷，docs/spec/004 §5）。
+    /// 實際交給匯流排與否由 `sync_watch` 決定；kgb-run 的 `--watch` 改寫這個值。
+    pub watch: Option<(usize, usize)>,
     pub take: Takeover,
     pub screen: Screen,
     pub catalog: Catalog,
@@ -50,7 +53,33 @@ pub struct Session {
     frames: Vec<Frame>,
     /// 各區塊（ES, DI）已完成的片語與插槽範圍（docs/spec/004 §7、§8）。
     segments: HashMap<(u16, u16), Vec<Segment>>,
+    /// 會觸發接手或觀察的 load segment 內偏移（64K 位元表）。每步只查這張表，
+    /// 命中、有進行中的片語呼叫、開了取證追蹤或圖塊快照到期時，才走完整檢查。
+    hooks: Box<[u64; 1024]>,
+    /// `sprites.next_due()` 的快取：每次 `observe` 後更新。
+    sprites_due: u64,
 }
+
+/// 入口閘登記的偏移：片語、插槽、開章、片尾、圖塊、游標、名單、文字 routine。
+fn hook_table() -> Box<[u64; 1024]> {
+    let mut t = Box::new([0u64; 1024]);
+    for ip in [
+        PHRASE_DECODE,
+        SLOT_FILL,
+        START_CHAPTER,
+        END_CREDITS_AT,
+        crate::sprites::SPRITE_SELECT,
+        crate::sprites::CURSOR_DRAW,
+        crate::credits::CENTER_AT,
+        crate::credits::LINE_AT,
+        crate::takeover::BLOCK,
+        crate::takeover::LINE,
+    ] {
+        t[usize::from(ip >> 6)] |= 1 << (ip & 63);
+    }
+    t
+}
+
 
 /// 片語解碼器入口（docs/re/004）：AX＝片語偏移、DS＝PHZ 段、ES:DI＝文字區塊。
 const PHRASE_DECODE: u16 = 0x53d8;
@@ -59,6 +88,10 @@ const SLOT_FILL: u16 = 0x56d5;
 /// 開章程式入口：AL＝章號（1–4），AH＝FFh；程式內把 AL 寫入 `[030e]`（`1bdf`）。
 /// 新遊戲由 `18d6` 取 `[030e]` 後在 `18db` 呼叫（docs/re/006）。
 const START_CHAPTER: u16 = 0x1bb9;
+/// 腳本變數程式 `4d19` 推完 bx、dx、di 的位置（`end_credits` 用，docs/spec/006 §4）。
+const END_CREDITS_AT: u16 = 0x4d1c;
+/// mode 13h 畫面（320×200）的線性範圍。
+const SCREEN_WATCH: (usize, usize) = (0xa0000, 0xaf9ff);
 
 /// 一次進行中的呼叫：以返回位址與進入時的 SP 判斷何時返回。
 struct Frame {
@@ -75,9 +108,8 @@ impl Session {
         let mut m = Machine::with_scratch(root, scratch)?;
         m.ips = ips;
         m.load_with_tail("CSPPRG.EXE", TAIL.as_bytes())?;
-        // 生命週期依 mode 13h 畫面寫入判斷（docs/spec/004 §5）。
-        m.bus.write_watch = Some((0xa0000, 0xaf9ff));
         Ok(Self {
+            watch: Some(SCREEN_WATCH),
             m,
             take: Takeover::default(),
             screen: Screen::default(),
@@ -96,25 +128,42 @@ impl Session {
             credits: Default::default(),
             frames: Vec::new(),
             segments: HashMap::new(),
+            hooks: hook_table(),
+            sprites_due: u64::MAX,
         })
+    }
+
+    /// 只在畫面寫入有人用時開寫入監看：有顯示中的覆繪項目、字卡在場或開了寫入者取證。
+    /// 其他時候這些紀錄只會被空處理後清掉，關掉監看結果相同。
+    fn sync_watch(&mut self) {
+        let need = self.writers.is_some() || self.sprites.card_active() || !self.screen.is_empty();
+        self.m.bus.write_watch = if need { self.watch } else { None };
     }
 
     /// 執行到步數達 `until` 或程式結束。
     pub fn run_until(&mut self, until: u64) -> Result<(), String> {
+        self.sync_watch();
         while self.m.cpu.steps < until && !self.m.exited {
-            if self.m.cpu.s[CS] == self.m.psp.wrapping_add(0x10) {
+            let load = self.m.psp.wrapping_add(0x10);
+            let ip = self.m.cpu.ip;
+            let at_load = self.m.cpu.s[CS] == load;
+            let hooked = at_load && self.hooks[usize::from(ip >> 6)] & (1 << (ip & 63)) != 0;
+            if at_load
+                && (hooked || !self.frames.is_empty() || self.trace_at.is_some() || self.m.cpu.steps >= self.sprites_due)
+            {
                 self.track_segments();
                 if self.m.cpu.ip == START_CHAPTER {
                     if let Some(n) = self.start_chapter.take() {
                         self.m.cpu.set8(0, n);
                     }
                 }
-                if self.m.cpu.ip == 0x4d1c && self.end_credits.is_some_and(|at| self.m.cpu.steps >= at) {
+                if self.m.cpu.ip == END_CREDITS_AT && self.end_credits.is_some_and(|at| self.m.cpu.steps >= at) {
                     self.end_credits = None;
                     self.m.cpu.ip = 0x4f82;
                 }
                 if !self.take.passthrough {
                     self.sprites.observe(&self.m);
+                    self.sprites_due = self.sprites.next_due();
                     if self.credit_hook() {
                         continue;
                     }
@@ -145,7 +194,10 @@ impl Session {
                     );
                 }
             }
-            if let Some(mut e) = self.take.intercept(&mut self.m) {
+            // 文字 routine 只在 BLOCK、LINE 兩個入口（已在表內）；IP 可能剛被上面改過，重新查表。
+            let ip = self.m.cpu.ip;
+            let text_hook = self.m.cpu.s[CS] == load && self.hooks[usize::from(ip >> 6)] & (1 << (ip & 63)) != 0;
+            if let Some(mut e) = text_hook.then(|| self.take.intercept(&mut self.m)).flatten() {
                 if e.kind == crate::takeover::Kind::Block {
                     e.segments = self.segments.get(&e.block).cloned().unwrap_or_default();
                 }
@@ -166,6 +218,7 @@ impl Session {
                 let taken = e.taken;
                 if taken && !e.text.is_empty() {
                     self.screen.on_event(Item { event: e, zh: shown });
+                    self.sync_watch();
                 }
                 if taken {
                     continue;
@@ -179,6 +232,7 @@ impl Session {
                     }
                 }
                 self.files_seen = self.m.file_log.len();
+                self.sync_watch();
             }
             if !self.m.bus.write_hits.is_empty() {
                 self.sprites.on_writes(self.m.cpu.steps, &self.m.bus.write_hits);
@@ -194,6 +248,7 @@ impl Session {
                 }
                 self.screen.on_writes(self.m.cpu.steps, &self.m.bus.write_hits);
                 self.m.bus.write_hits.clear();
+                self.sync_watch();
             }
         }
         Ok(())

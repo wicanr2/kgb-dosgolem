@@ -113,6 +113,8 @@ tools/package.sh with-data all      # 本機完整版（Linux AppImage、Windows
 
 本機完整版內含原版資料，只供自己使用，請勿散布。
 
+工具列的「時脈」選單調整模擬速度：「自動」依電腦實際速度調整，「最大」盡量用滿一顆 CPU，也可以固定 5M 到 40M 指令／秒，選擇會記住。「快轉」不照真實時間跑，可以跳過長動畫，期間不出聲。
+
 ## 文件
 
 - [工作契約](AGENTS.md)、[目前狀態](CONTEXT.md)、[歷程](WORKLOG.md)

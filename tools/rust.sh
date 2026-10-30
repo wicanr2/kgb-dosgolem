@@ -104,8 +104,8 @@ case "$cmd" in
       --log-opt max-size=10m --log-opt max-file=3 \
       -e HOME=/tmp -e DISPLAY -e WGPU_BACKEND=vulkan -e LANG -e LC_ALL -e LC_MESSAGES "${gpu[@]}" "${auth[@]}" \
       -v /tmp/.X11-unix:/tmp/.X11-unix:ro -v "$WP/target/release:/tool:ro" -v "$WP/disc/cd:/game:ro" \
-      -v "$ROOT/text:/text:ro" -v "$font_dir:/fonts:ro" -v "$WP/play/scratch:/save" "$GUI_IMAGE" \
-      /tool/kgb-play --root /game --scratch /save --text /text --font /fonts/NotoSansCJK-Medium.ttc "$@"
+      -v "$ROOT/text:/text:ro" -v "$font_dir:/fonts:ro" -v "$WP/play:/play" "$GUI_IMAGE" \
+      /tool/kgb-play --root /game --scratch /play/scratch --text /text --font /fonts/NotoSansCJK-Medium.ttc "$@"
     ;;
   gui-check)
     # 無頭驗證視窗：Xvfb＋lavapipe，跑指定秒數後擷取畫面為 PNG。

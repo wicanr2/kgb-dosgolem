@@ -8,10 +8,10 @@ use ferrogolem_core::machine::Machine;
 const DATA: u16 = 0x2144 - 0x188b;
 const DRIVER: u16 = 0x51e0 - 0x188b;
 /// 畫圖塊（選取圖塊後交給驅動畫進離屏緩衝）。
-const SPRITE_SELECT: u16 = 0x85f3;
+pub(crate) const SPRITE_SELECT: u16 = 0x85f3;
 const SPRITE_SIG: [u8; 10] = [0x1e, 0x53, 0x51, 0x8e, 0x06, 0xc0, 0x06, 0xbf, 0x00, 0x64];
 /// 每格畫游標圖（`lcall [05ea]`），CX、BX＝左上角。
-const CURSOR_DRAW: u16 = 0x7093;
+pub(crate) const CURSOR_DRAW: u16 = 0x7093;
 const CURSOR_SIG: [u8; 4] = [0xff, 0x1e, 0xea, 0x05];
 /// 圖塊畫進離屏緩衝所需的步數上限（ex-menu4：13,746 步內畫完）。
 const DRAW_WINDOW: u64 = 40_000;
@@ -184,6 +184,11 @@ impl Sprites {
         }
     }
 
+    /// 字卡在場（等待上屏或等待移除）；不在場時畫面寫入不影響字卡。
+    pub fn card_active(&self) -> bool {
+        self.card.is_some()
+    }
+
     /// 一步之內對 A0000 的寫入：第一波寫到字卡矩形算上屏，之後新的一波就移除。
     pub fn on_writes(&mut self, step: u64, hits: &[usize]) {
         let Some((i, committed, last)) = self.card else { return };
@@ -239,6 +244,16 @@ impl Sprites {
                 }
             }
         }
+    }
+
+    /// `observe` 下一次需要做時間型檢查（游標與選單快照）的步數；沒有待辦時為 `u64::MAX`。
+    /// 呼叫端在這之前只需在 `SPRITE_SELECT`、`CURSOR_DRAW` 呼叫 `observe`。
+    pub fn next_due(&self) -> u64 {
+        let cursor = match (self.cursor, &self.cursor_snap) {
+            (Some((at, ..)), None) => at + DRAW_WINDOW,
+            _ => u64::MAX,
+        };
+        self.menus.iter().filter(|p| p.snap.is_none()).map(|p| p.step + DRAW_WINDOW).fold(cursor, u64::min)
     }
 
     /// 依目前畫面（mode 13h 色號）算出要畫的標籤；已關閉的選單在此移除。
