@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: LicenseRef-RRSAL-1.0
+# 推廣影片合成用映像（ffmpeg、ImageMagick、Noto CJK 字型）。建置：docker build -f tools/Dockerfile.video -t kgb-cht-video:1 tools
+FROM debian:bookworm-slim
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ffmpeg imagemagick fonts-noto-cjk fonts-noto-cjk-extra \
+ && rm -rf /var/lib/apt/lists/*
+USER 1000:1000
