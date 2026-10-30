@@ -173,7 +173,9 @@ verify() {  # 架構與內容檢查
     echo macOS 架構檢查通過'
   for f in "$OUT"/*; do
     case "$f" in
-      *.zip) unzip -l "$f" | grep -q "original/cd/CSPPRG.EXE" || die "$f 缺原版" ; unzip -l "$f" | grep -q "text/chapter4.zh-TW.tsv" || die "$f 缺譯文" ;;
+      *.zip) list="$(unzip -Z1 "$f")"  # 先存清單：pipefail 下 grep -q 提早結束會讓 unzip 收到 SIGPIPE 而誤判
+        grep -q "original/cd/CSPPRG.EXE" <<<"$list" || die "$f 缺原版"
+        grep -q "text/chapter4.zh-TW.tsv" <<<"$list" || die "$f 缺譯文" ;;
       *.AppImage) test "$(head -c 4 "$f" | od -An -c | tr -d ' ')" = '177ELF' || die "$f 不是 ELF" ;;
     esac
     echo "$(du -h "$f" | cut -f1)  $(basename "$f")"
