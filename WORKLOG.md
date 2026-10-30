@@ -85,3 +85,4 @@
   - 剖析：perf 在主機 `perf_event_paranoid=4` 下即使容器加 `CAP_PERFMON`、`SYS_ADMIN` 與解除 seccomp 也被擋，沒有再提高權限；改用 pprof 的本機剖析程式（`workplace/profiler`，不進版控）。量測受主機負載與效能核／節能核影響，單次可差兩倍，改為 `--cpuset-cpus` 釘在效能核、交替多輪取最小值（`workplace/profbench`）。
   - 接手層：`run_until` 每步原本要做十幾項 IP 比對與時間檢查。加入口閘（64K 位元表登記片語、插槽、開章、片尾、圖塊、游標、名單、文字 routine 的入口），只在命中、有進行中的片語呼叫、開了取證追蹤或圖塊快照到期（`Sprites::next_due`）時走原本的完整檢查；畫面寫入監看只在有覆繪項目、字卡在場或開了寫入者取證時開。每秒步數約 2,180 萬→2,890 萬。兩組帶輸入的實跑（倒帶重播 960M 步、辦公室滑鼠 1.3B 步）文字事件、29 張截圖、覆繪移除數與改前逐筆相同。
   - 前端（FerroGolem `9c8d87f`）：時脈選單、快轉、設定檔 `frontend.cfg`；`kgb-play` 的 `--cycles` 改為選填，`tools/rust.sh play` 改掛 `workplace/play`，設定檔存在 `workplace/play/frontend.cfg`。
+- 設定視窗（使用者要求「在工具列提供設定這些功能，還有 bar 可以調整速度」）：FerroGolem `3420b54`。工具列改為暫停、設定、快轉；設定視窗有時脈模式、速度滑桿（1M–100M 對數刻度，拖動即改為固定）、快轉倍率（2×–8×、最快）、音量與靜音。kgb-play 的呼叫介面不變。實測時開設定視窗就把自動改成固定並寫檔（滑桿捨入回報 changed），已修正；xdotool 瞬間點擊點不動滑桿，按住約 0.3 秒或拖動才算操作。
