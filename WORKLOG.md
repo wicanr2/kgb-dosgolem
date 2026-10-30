@@ -71,3 +71,4 @@
   - Linux 冷開機：繁中、簡中語系各一次，自動選語言、建存檔層、中文字幕正常。影片畫面呈點陣網格，開 issue #7。
   - 推廣影片 `tools/promo.sh`：`kgb-cht-video` 映像內合成，配色取自名單金字、磚紅背景與紅星；音訊未完成，無配樂。緣起卡改寫為敘述，不替他人編造引語。
   - 舊打包映像 `kgb-cht-pkg:1.99.1-r1`（11GB，含無法執行的 osxcross）已不使用，依規則不自行 rmi，留給使用者決定。
+- 使用者指示正式升為 v1.0.0（只改檔名與目錄名）：`v0.1.1` 的三個完整版改名為 `kgb-cht-v1.0.0-*`，推廣影片改名為 `kgb-cht-v1.0.0-promo.mp4`；包內 `讀我.txt` 與 macOS `Info.plist` 的版本字串仍是 0.1.1。完整版改集中放 repo 根目錄 `dist-all/`（加入 .gitignore），`tools/package.sh` 輸出改到該處並只留目前版本。查遊戲中文名稱：英文資料庫（Wikipedia、MobyGames、Internet Archive）只有 KGB 與 CD 版 Conspiracy，中文關鍵字查無代理版或譯名。

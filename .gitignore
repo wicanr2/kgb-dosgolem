@@ -19,3 +19,4 @@
 /workplace/
 /target/
 !/docs/images/*.png
+/dist-all/

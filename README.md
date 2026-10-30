@@ -84,7 +84,7 @@ tools/rust.sh fetch                 # 抓依賴，只有這一步開網路
 tools/rust.sh build
 tools/rust.sh test
 tools/rust.sh play                  # 在 X11 桌面開視窗玩；預設語言依系統語系
-tools/package.sh with-data all      # 本機完整版（Linux、Windows、macOS），放 workplace/dist/
+tools/package.sh with-data all      # 本機完整版（Linux AppImage、Windows、macOS，內含遊戲），放 dist-all/
 ```
 
 本機完整版內含原版資料，只供自己使用，請勿散布。

@@ -5,7 +5,7 @@
 #   tools/package.sh image                       建打包映像（唯一需要網路的一步，另抓 AppImage runtime）
 #   tools/package.sh with-data [linux|windows|macos|all]
 #                                                本機完整版：內含原版光碟資料，解開就能玩。
-#                                                只放 workplace/dist/，不進 Git、不上傳。
+#                                                集中放 dist-all/（只留目前版本），不進 Git、不上傳。
 #
 # 版本取自 git describe；本庫與 FerroGolem 的樹都要乾淨且 HEAD 已推送。
 set -euo pipefail
@@ -198,8 +198,9 @@ case "${1:-}" in
     # 掛載前先建好，否則 dockerd 會以 root 建目錄（AGENTS.md §9）。
     mkdir -p "$WP/target-pkg" "$WP/cargo"
     check_text
-    OUT="$WP/dist/$VERSION"
-    rm -rf "$OUT"; mkdir -p "$OUT"
+    # 完整版集中在 repo 根目錄的 dist-all/（.gitignore），只留目前版本（§15.1）。
+    OUT="$ROOT/dist-all"
+    mkdir -p "$OUT"; rm -f "$OUT/$NAME"-*
     case "${2:-all}" in
       linux) linux ;; windows) windows ;; macos) macos ;;
       all) linux; windows; macos ;;
