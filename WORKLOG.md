@@ -64,3 +64,10 @@
 - 依使用者指示把待辦登記成 GitHub issue：#1 發行打包、#2 發行包冒煙測試、#3 音訊輸出、#4 片尾名單、#5 框內訊息與物品插槽、#6 IDA 交叉驗證；worklist 同步新增 `release-package`、`release-smoke`、`audio-output`，每條 verify.note 寫上 issue 編號。前端沒有音訊輸出（SB 樣本丟棄、OPL 未合成）首次列為待辦。
 - 片尾名單（#4）：只把名單程式改走片尾分支會在第一個頭像 `# T` 當掉（頭像資料與驅動指標在開新局時未就緒）。改從正常片尾路徑：腳本變數程式值 F0h 時 `4f82` 呼叫 `231e`；`kgb-run --end-credits N` 在 N 步後第一次到 `4d1c`（`4d19` 推完三個暫存器）時改 IP 到 `4f82`。閒置的辦公室不會呼叫 `4d19`，門檻要落在場景載入時的最後一次呼叫之前（673232800）。片尾 34 個職稱與角色名全部命中，名字在頭像另一側。使用者同意 README 截圖放 `docs/images/`，AGENTS.md §2 加入例外。
 - 框內訊息（#5 部分）：腳本事件佇列其實是 1 KB 歷史紀錄（5130–5530，`7112` 寫入、`7523` 重播分派）；按右下角倒帶鈕進入重播模式（右上角「R」）後，第 8 號事件由 `764a` 組字畫全寬框，在 `7727` 呼叫 `86e9`（返回 `772a`）。剛開局沒有歷史時倒帶不重播；先和別洛夫對話再倒帶即出現（rewind2）。`772a` 加入接手清單後框內顯示「你詢問別洛夫。」（rewind3）。發行包啟動準備：`kgb_cht::install` 找包內 text/、font/、original/，自實作 SHA-256 核對 CSPPRG.EXE 與 CSP.CFG，在使用者資料目錄建存檔層並開字幕；`kgb-play` 不帶 `--root` 時進入發行包模式。
+- 本機三平台完整版與推廣影片（使用者指示「打包三平台完整版 in local」）：
+  - `tools/package.sh with-data` 在 Docker 內建 Linux AppImage（mksquashfs＋type2 runtime，runtime 雜湊記在腳本）、Windows zip（mingw-w64）、macOS universal `.app`（osxcross 兩弧＋lipo，未簽 bundle）。
+  - 啟動準備 `kgb_cht::install`：包內 `text/`、`font/`、`original/` 自動尋找，SHA-256 核對原版，在使用者資料目錄建存檔層並開字幕。
+  - 踩到的問題：check_text 掛載不存在的目錄使 dockerd 以 root 建目錄（改為先 mkdir）；打包映像沒有 curl（改 python3）；crazymax osxcross 需要 glibc 2.38（macOS 另立 Ubuntu 24.04 映像）；buildkit 的 DNS 解析到連不上的 Debian 鏡像（`docker build --network host`）；壓縮檔檢查在 pipefail 下 `grep -q` 讓 `unzip` 收到 SIGPIPE 而誤判（先存清單）。最後一項修正發生在 `v0.1.0` 標籤之後，刪遠端標籤被權限擋下，改打 `v0.1.1`。
+  - Linux 冷開機：繁中、簡中語系各一次，自動選語言、建存檔層、中文字幕正常。影片畫面呈點陣網格，開 issue #7。
+  - 推廣影片 `tools/promo.sh`：`kgb-cht-video` 映像內合成，配色取自名單金字、磚紅背景與紅星；音訊未完成，無配樂。緣起卡改寫為敘述，不替他人編造引語。
+  - 舊打包映像 `kgb-cht-pkg:1.99.1-r1`（11GB，含無法執行的 osxcross）已不使用，依規則不自行 rmi，留給使用者決定。

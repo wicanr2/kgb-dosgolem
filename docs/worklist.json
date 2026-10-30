@@ -12,7 +12,7 @@
    "id": "release-package",
    "layer": "release",
    "title": "發行打包：tools/package.sh",
-   "body": "尚未開始。單一腳本在 Docker 內建 Linux AppImage、Windows zip、macOS universal .app；含譯文表、可散布字型、授權、啟動器（original/ 匯入）與外洩掃描（~/cht/AGENTS_DOSGOLEM_CHT.md §15.1）。",
+   "body": "本機完整版已完成：tools/package.sh with-data all 建出 Linux AppImage、Windows zip、macOS universal .app（v0.1.1，含原版，只放 workplace/dist/）；kgb-play 不帶 --root 時從包內找資料、核對原版雜湊、在使用者資料目錄建存檔層。未完成：不含原版的公開版（玩家自備原版的匯入流程與外洩掃描）。",
    "acceptance": "三個平台的包都能建出，架構與內容檢查通過；外洩掃描有負對照。",
    "verify": {
     "kind": "manual",
