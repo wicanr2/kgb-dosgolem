@@ -53,7 +53,7 @@ if [ "$PL" = zh-CN ]; then
   C06='第二章　列宁格勒，戈斯季尼察饭店'; C07='第四章　码头，八月政变前夕'; C08='倒带重播时的框内信息'
   C09='片头名单跟着原版淡入淡出'; C10='片尾演员表'
   T11='繁中・简中・英文原版 随时切换'; S11='github.com/wicanr2/kgb-dosgolem　RRSAL-1.0　不附原版游戏'
-  Q12='原版游戏著作权属 Cryo Interactive、Virgin Games 及其权利继承者'; Q12B="配乐取自原版游戏录音，著作权属原权利人　${VERSION}"
+  Q12='原版游戏著作权属 Cryo Interactive、\nVirgin Games 及其权利继承者'; Q12B="配乐取自原版游戏录音，著作权属原权利人　${VERSION}"
   SHOT05=/img/ch1-cursor.png
 else
   FB=Noto-Serif-CJK-TC-Bold; FR=Noto-Sans-CJK-TC   # TC 字形
@@ -64,7 +64,7 @@ else
   C06='第二章　列寧格勒，戈斯季尼察飯店'; C07='第四章　碼頭，八月政變前夕'; C08='倒帶重播時的框內訊息'
   C09='片頭名單跟著原版淡入淡出'; C10='片尾演員表'
   T11='繁中・简中・英文原版 隨時切換'; S11='github.com/wicanr2/kgb-dosgolem　RRSAL-1.0　不附原版遊戲'
-  Q12='原版遊戲著作權屬 Cryo Interactive、Virgin Games 及其權利繼承者'; Q12B="配樂取自原版遊戲錄音，著作權屬原權利人　${VERSION}"
+  Q12='原版遊戲著作權屬 Cryo Interactive、\nVirgin Games 及其權利繼承者'; Q12B="配樂取自原版遊戲錄音，著作權屬原權利人　${VERSION}"
   SHOT05=/img/ch1-action-menu.png
 fi
 export HOME=/tmp   # fontconfig 快取
@@ -86,10 +86,10 @@ slide() {  # $1 輸出 $2 截圖 $3 字幕
     -fill '#000000b0' -draw "rectangle 0,628 ${W},720" \
     -font "$FR" -fill "$CREAM" -gravity south -pointsize 36 -annotate +0+26 "$3" "$1"
 }
-quote() {  # $1 輸出 $2 主文 $3 附註
+quote() {  # $1 輸出 $2 主文（\n 換行） $3 附註 $4 附註位置（預設 +0+90）
   convert -size ${W}x${H} "gradient:${BG1}-${BG2}" -font "$FB" \
     -fill "$CREAM" -pointsize 50 -gravity center -annotate +0-20 "$2" \
-    -font "$FR" -fill "$GOLD" -pointsize 30 -annotate +0+90 "$3" "$1"
+    -font "$FR" -fill "$GOLD" -pointsize 30 -annotate "${4:-+0+90}" "$3" "$1"
 }
 clip() {  # $1 png $2 秒
   local fo; fo=$(awk "BEGIN{print $2-0.6}")
@@ -121,7 +121,7 @@ slide $T/08.png /img/ch1-replay-box.png "$C08"
 slide $T/09.png /img/credits-opening.png "$C09"
 slide $T/10.png /img/credits-cast.png "$C10"
 card  $T/11.png "$NAME" "$T11" "$S11"
-quote $T/12.png "$Q12" "$Q12B"
+quote $T/12.png "$Q12" "$Q12B" +0+130
 
 : > $T/list.txt
 for f in 00:6 01:5 02:6 03:6 04:5.5 05:5.5 06:5.5 07:5.5 08:5 09:5 10:5 11:6 12:4; do

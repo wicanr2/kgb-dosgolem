@@ -12,7 +12,8 @@
 - 第二到四章片語已全部翻譯：`text/chapter2.zh-TW.tsv`（CHAP2A，2,501 key）、`chapter3`（CHAP3U，298 key）、`chapter4`（CHAP4U，768 key）；說明影片第二到四章提示（THA2–THA4）在 `text/help-ch234.zh-TW.tsv`（172 key）。各章片語彼此不重疊。以 `kgb-run --chapter N --cycles 1000` 從各章開頭抽樣，除時鐘外的文字事件全部有譯文、畫面顯示中文（docs/re/006，ch2-d、ch3-a、ch4-a）；比對鍵命中也證實各章用的是 CHAP2A、CHAP3U、CHAP4U。
 - 片頭名單（docs/spec/006）：名單程式逐行畫字前接手（`8a07`），跳過英文；職稱以中文、真人姓名與公司名以原文畫在覆繪層，跟著原版每頁的淡入淡出（credits-zh2）。譯文在 `text/credits.zh-TW.tsv`。片尾名單走同一路徑，以 `kgb-run --end-credits` 從腳本的片尾路徑觸發實測，演員表的角色名畫在頭像旁（endcred-4、endcred-5）。
 - 兩個中文版本：繁中（台灣用語）為翻譯產物；簡中 `text/*.zh-CN.tsv` 由 `kgb-zhcn` 以 OpenCC tw2sp 加譯名表簡中欄從繁中產生，`kgb-zhcn --check` 驗證產物與來源一致。
-- 本機完整版（v1.0.0，中文名《KGB 陰謀》）：`tools/package.sh with-data all` 建出 Linux AppImage、Windows zip、macOS universal .app，內含原版，集中放在 `dist-all/`。Linux 版在 Xvfb 冷開機，繁中與簡中語系都自動選對語言並顯示中文字幕（smoke-linux1、smoke-linux-cn）；Windows、macOS 只做了架構與內容的靜態檢查，沒有實機。推廣影片 `tools/promo.sh`（70 秒、無配樂）。
+- 本機完整版（v1.1.0，中文名《KGB 陰謀》）：`tools/package.sh with-data all` 建出 Linux AppImage、Windows zip、macOS universal .app，內含原版，集中放在 `dist-all/`。Linux 版在 Xvfb 冷開機，繁中與簡中語系都自動選對語言並顯示中文字幕（smoke-linux1、smoke-linux-cn；v1.1.0 為 smoke-linux-v110）；Windows、macOS 只做了架構與內容的靜態檢查，沒有實機。推廣影片 `tools/promo.sh` 分繁中、簡中兩版（90 秒，含 40 秒實機片段，配樂為模擬器錄下的片頭名單 AdLib 音樂）。
+- 聲音：FerroGolem 合成 AdLib（Nuked OPL3）並混入 SB 樣本，`kgb-play` 由前端輸出，`kgb-run --wav` 錄成 WAV（FerroGolem docs/spec/007）。說明影片之前沒有任何 SB 樣本，開場影片是否應有數位聲音待對拍（#3）。
 - 可開視窗遊玩：`tools/rust.sh play`（FerroGolem GUI 前端）。工具列可選繁中、简中、英文原版，預設依 `LC_ALL`、`LC_MESSAGES`、`LANG`。Xvfb 無頭驗證：繁中字幕（`gui-k1`、`gui-k2`）、簡中字幕與 SC 字形（`gui-cn1`）、英文原版由原版照畫（`gui-en1`）。執行中點選切換語言尚未以 GUI 操作驗證。時脈改為 cycles 20000 後開場以正常速度播放。
 - 對拍基準 dosgolem-rust 分支 `kgb-oracle` 已跑出完整開場，6 句字幕與攔到的事件逐字相同（FerroGolem docs/re/001）。開場字卡「Moscow, August 1991...」不經文字 routine，推測是語系圖檔（worklist `image-localization`）。
 - 未完成項見 `docs/worklist.json`，以 `tools/worklist.py verify` 檢查。
