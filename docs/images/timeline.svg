@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" font-family="Noto Sans CJK TC, sans-serif">
+  <rect width="1200" height="640" fill="#170c08"/>
+  <text x="40" y="58" font-size="34" font-weight="700" fill="#d2ac64">KGB 陰謀：歷史與遊戲時間線</text>
+  <text x="40" y="90" font-size="17" fill="#bfae90">金色為遊戲四章的日期（取自章節標題）；白色為史實（出處見 README「時代背景」）</text>
+
+  <!-- 上段：大時間軸 -->
+  <line x1="60" y1="170" x2="1140" y2="170" stroke="#6b4a2a" stroke-width="4"/>
+  <g font-size="16" fill="#f2e6cc">
+    <circle cx="90" cy="170" r="9" fill="#f2e6cc"/>
+    <text x="90" y="146" text-anchor="middle" font-weight="700">1954</text>
+    <text x="90" y="200" text-anchor="middle">KGB 成立</text>
+    <circle cx="300" cy="170" r="9" fill="#f2e6cc"/>
+    <text x="300" y="146" text-anchor="middle" font-weight="700">1985</text>
+    <text x="300" y="200" text-anchor="middle">戈巴契夫推動改革</text>
+    <circle cx="560" cy="170" r="13" fill="#b81c1c"/>
+    <text x="560" y="146" text-anchor="middle" font-weight="700">1991</text>
+    <text x="560" y="200" text-anchor="middle">八月政變、蘇聯解體</text>
+    <text x="560" y="222" text-anchor="middle" fill="#bfae90" font-size="14">（下方放大）</text>
+    <circle cx="820" cy="170" r="9" fill="#d2ac64"/>
+    <text x="820" y="146" text-anchor="middle" font-weight="700" fill="#d2ac64">1992</text>
+    <text x="820" y="200" text-anchor="middle" fill="#d2ac64">《KGB》發行</text>
+    <circle cx="1060" cy="170" r="9" fill="#d2ac64"/>
+    <text x="1060" y="146" text-anchor="middle" font-weight="700" fill="#d2ac64">1993</text>
+    <text x="1060" y="200" text-anchor="middle" fill="#d2ac64">CD 版 Conspiracy</text>
+  </g>
+  <path d="M520 232 L80 300 M600 232 L1120 300" stroke="#4a3220" stroke-width="2" fill="none"/>
+
+  <!-- 下段：1991 年放大 -->
+  <rect x="40" y="300" width="1120" height="310" rx="10" fill="#22130c" stroke="#4a3220"/>
+  <text x="60" y="334" font-size="20" font-weight="700" fill="#f2e6cc">1991 年</text>
+  <line x1="80" y1="420" x2="1120" y2="420" stroke="#6b4a2a" stroke-width="3"/>
+  <g font-size="15" fill="#f2e6cc" text-anchor="middle">
+    <circle cx="110" cy="420" r="7" fill="#f2e6cc"/>
+    <text x="110" y="398" font-weight="700">6 月 12 日</text>
+    <text x="110" y="448">列寧格勒公投</text>
+    <text x="110" y="468">恢復舊名</text>
+
+    <rect x="230" y="360" width="440" height="120" rx="8" fill="#3a2410" opacity="0.6"/>
+    <text x="450" y="378" fill="#d2ac64" font-size="14">遊戲四章（8 月 14–18 日）</text>
+    <circle cx="270" cy="420" r="8" fill="#d2ac64"/>
+    <text x="270" y="398" font-weight="700" fill="#d2ac64">8/14</text>
+    <text x="270" y="448" fill="#d2ac64">第一章</text>
+    <text x="270" y="468" fill="#d2ac64">莫斯科 P 處</text>
+    <circle cx="400" cy="420" r="8" fill="#d2ac64"/>
+    <text x="400" y="398" font-weight="700" fill="#d2ac64">8/16</text>
+    <text x="400" y="448" fill="#d2ac64">第二章</text>
+    <text x="400" y="468" fill="#d2ac64">列寧格勒飯店</text>
+    <circle cx="510" cy="420" r="8" fill="#d2ac64"/>
+    <text x="510" y="398" font-weight="700" fill="#d2ac64">8/17</text>
+    <text x="510" y="448" fill="#d2ac64">第三章</text>
+    <text x="510" y="468" fill="#d2ac64">碼頭</text>
+    <circle cx="620" cy="420" r="8" fill="#d2ac64"/>
+    <text x="620" y="398" font-weight="700" fill="#d2ac64">8/18</text>
+    <text x="620" y="448" fill="#d2ac64">第四章</text>
+    <text x="620" y="468" fill="#d2ac64">碼頭</text>
+    <text x="620" y="508" font-size="13" fill="#f2e6cc">同日戈巴契夫在福羅斯被軟禁</text>
+
+    <circle cx="760" cy="420" r="11" fill="#b81c1c"/>
+    <text x="760" y="398" font-weight="700">8 月 19–22 日</text>
+    <text x="760" y="448">八月政變</text>
+    <text x="760" y="468">KGB 主席也參與</text>
+    <text x="760" y="488">三天後失敗</text>
+    <circle cx="890" cy="420" r="7" fill="#f2e6cc"/>
+    <text x="890" y="398" font-weight="700">9 月 6 日</text>
+    <text x="890" y="448">列寧格勒改名</text>
+    <text x="890" y="468">聖彼得堡</text>
+    <circle cx="1000" cy="420" r="7" fill="#f2e6cc"/>
+    <text x="1000" y="398" font-weight="700">12 月 3 日</text>
+    <text x="1000" y="448">KGB 解散</text>
+    <circle cx="1100" cy="420" r="7" fill="#f2e6cc"/>
+    <text x="1100" y="398" font-weight="700">12 月 26 日</text>
+    <text x="1100" y="448">蘇聯解體</text>
+  </g>
+  <text x="60" y="590" font-size="14" fill="#bfae90">遊戲的最後一天是政變爆發前一天；遊戲裡的城市仍叫列寧格勒，因為改名在九月才生效。</text>
+</svg>

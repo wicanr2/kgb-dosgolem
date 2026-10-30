@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" font-family="Noto Sans CJK TC, sans-serif">
+  <rect width="1200" height="700" fill="#170c08"/>
+  <text x="40" y="58" font-size="34" font-weight="700" fill="#d2ac64">KGB 陰謀：主要人物</text>
+  <text x="40" y="90" font-size="17" fill="#bfae90">身分取自遊戲開場旁白、場景文字與片尾演員表；查不到身分的只列名字與出場地點</text>
+
+  <!-- 主角 -->
+  <rect x="440" y="120" width="320" height="110" rx="12" fill="#3a1a10" stroke="#d2ac64" stroke-width="3"/>
+  <text x="600" y="160" font-size="24" font-weight="700" fill="#d2ac64" text-anchor="middle">馬克西姆·魯科夫上尉</text>
+  <text x="600" y="190" font-size="16" fill="#f2e6cc" text-anchor="middle">主角。前特種部隊軍官（隸屬格魯烏），</text>
+  <text x="600" y="212" font-size="16" fill="#f2e6cc" text-anchor="middle">1991 年 8 月調進莫斯科 KGB 第二總局 P 處</text>
+
+  <!-- 家人與長輩 -->
+  <rect x="40" y="120" width="340" height="150" rx="10" fill="#22130c" stroke="#6b4a2a"/>
+  <text x="60" y="150" font-size="18" font-weight="700" fill="#d2ac64">家人與長輩</text>
+  <text x="60" y="182" font-size="17" fill="#f2e6cc" font-weight="700">父親（Donald Sutherland 飾）</text>
+  <text x="60" y="204" font-size="15" fill="#bfae90">前格魯烏軍官，早已過世；在說明影片中</text>
+  <text x="60" y="224" font-size="15" fill="#bfae90">以記憶中的模樣現身給建議</text>
+  <text x="60" y="252" font-size="17" fill="#f2e6cc" font-weight="700">萬尼亞叔叔</text>
+  <text x="170" y="252" font-size="15" fill="#bfae90">前格魯烏軍官，要他提防背後</text>
+  <line x1="380" y1="190" x2="440" y2="175" stroke="#6b4a2a" stroke-width="2"/>
+
+  <!-- 第一章 莫斯科 -->
+  <rect x="820" y="120" width="340" height="150" rx="10" fill="#22130c" stroke="#6b4a2a"/>
+  <text x="840" y="150" font-size="18" font-weight="700" fill="#d2ac64">第一章　莫斯科 KGB P 處</text>
+  <text x="840" y="182" font-size="17" fill="#f2e6cc" font-weight="700">沃夫洛夫少校</text>
+  <text x="960" y="182" font-size="15" fill="#bfae90">魯科夫的上級</text>
+  <text x="840" y="212" font-size="17" fill="#f2e6cc" font-weight="700">別洛夫上尉</text>
+  <text x="960" y="212" font-size="15" fill="#bfae90">同辦公室的同事</text>
+  <text x="840" y="242" font-size="17" fill="#f2e6cc" font-weight="700">加盧什金上校</text>
+  <line x1="760" y1="175" x2="820" y2="190" stroke="#6b4a2a" stroke-width="2"/>
+
+  <line x1="600" y1="230" x2="600" y2="300" stroke="#6b4a2a" stroke-width="2"/>
+  <line x1="200" y1="300" x2="1000" y2="300" stroke="#6b4a2a" stroke-width="2"/>
+  <line x1="200" y1="300" x2="200" y2="330" stroke="#6b4a2a" stroke-width="2"/>
+  <line x1="600" y1="300" x2="600" y2="330" stroke="#6b4a2a" stroke-width="2"/>
+  <line x1="1000" y1="300" x2="1000" y2="330" stroke="#6b4a2a" stroke-width="2"/>
+
+  <!-- 第二章 -->
+  <rect x="40" y="330" width="340" height="250" rx="10" fill="#22130c" stroke="#6b4a2a"/>
+  <text x="60" y="360" font-size="18" font-weight="700" fill="#d2ac64">第二章　列寧格勒（飯店）</text>
+  <text x="60" y="394" font-size="17" fill="#f2e6cc" font-weight="700">庫茲涅佐夫上校</text>
+  <text x="60" y="416" font-size="15" fill="#bfae90">列寧格勒 KGB</text>
+  <text x="60" y="448" font-size="17" fill="#f2e6cc" font-weight="700">阿加別科夫少校</text>
+  <text x="60" y="470" font-size="15" fill="#bfae90">第二總局第七處副處長</text>
+  <text x="60" y="502" font-size="17" fill="#f2e6cc" font-weight="700">恰普金上尉</text>
+  <text x="60" y="524" font-size="15" fill="#bfae90">第二章中遇害</text>
+
+  <!-- 第三章 -->
+  <rect x="430" y="330" width="340" height="250" rx="10" fill="#22130c" stroke="#6b4a2a"/>
+  <text x="450" y="360" font-size="18" font-weight="700" fill="#d2ac64">第三章　列寧格勒（碼頭）</text>
+  <text x="450" y="394" font-size="17" fill="#f2e6cc" font-weight="700">薩溫科夫少校</text>
+  <text x="450" y="426" font-size="17" fill="#f2e6cc" font-weight="700">卡拉·華勒斯</text>
+  <text x="450" y="458" font-size="15" fill="#bfae90">出現的船：「維克托·馬茨涅夫號」</text>
+
+  <!-- 第四章 -->
+  <rect x="820" y="330" width="340" height="250" rx="10" fill="#22130c" stroke="#6b4a2a"/>
+  <text x="840" y="360" font-size="18" font-weight="700" fill="#d2ac64">第四章　列寧格勒</text>
+  <text x="840" y="394" font-size="17" fill="#f2e6cc" font-weight="700">齊布連科教授</text>
+  <text x="840" y="416" font-size="15" fill="#bfae90">羅戈夫精神病學研究所</text>
+  <text x="840" y="448" font-size="17" fill="#f2e6cc" font-weight="700">普羅托波波夫</text>
+  <text x="840" y="480" font-size="17" fill="#f2e6cc" font-weight="700">納撒尼爾·格林伯格</text>
+  <text x="840" y="502" font-size="15" fill="#bfae90">美國記者</text>
+
+  <text x="40" y="630" font-size="14" fill="#bfae90">P 處的職責是清查 KGB 內部腐敗。人物出場章節以譯文所在的章節檔判斷，同一人物可能跨章出現。</text>
+  <text x="40" y="656" font-size="14" fill="#bfae90">片尾演員表另有伊琳娜·羅馬什科娃、古岑科中士、亞薩克夫、瑟堅科、韋爾托、娜塔莎、塔瑪拉、洛吉諾夫等人。</text>
+</svg>
