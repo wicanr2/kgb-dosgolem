@@ -5,7 +5,8 @@
 # 配樂：workplace/promo/music/bgm.wav（kgb-run --wav 從模擬器錄下的原版 AdLib 與數位音訊）存在時循環鋪滿全片，淡入淡出；片尾卡註明權利歸屬。
 #
 #   tools/promo.sh [zh-TW|zh-CN|all]          合成（預設 all）。繁中截圖取自 docs/images/，簡中取自 workplace/promo/zh-CN/；
-#                                             兩者另需 workplace/promo/<語言>/intro-card.png 與 gameplay.mp4
+#                                             兩者另需 workplace/promo/<語言>/intro-card.png、gameplay.mp4（kgb-run 以速度 100M 錄，
+#                                             輸入 workplace/inputs/gameplay-fast.txt）與 settings.mp4（tools/promo-settings.sh）
 #   tools/promo.sh gameplay <目錄> <語言>     把 kgb-run --frames 的 frames.rgb 編成 workplace/promo/<語言>/gameplay.mp4（§15.3a）
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -32,7 +33,7 @@ fi
 render() {  # $1＝語言
   local lang=$1 img
   case "$lang" in zh-TW) img="$ROOT/docs/images" ;; zh-CN) img="$OUTDIR/zh-CN" ;; *) echo "語言只接受 zh-TW、zh-CN" >&2; exit 1 ;; esac
-  for f in "$OUTDIR/$lang/intro-card.png" "$OUTDIR/$lang/gameplay.mp4" "$img/ch1-office-narration.png"; do
+  for f in "$OUTDIR/$lang/intro-card.png" "$OUTDIR/$lang/gameplay.mp4" "$OUTDIR/$lang/settings.mp4" "$img/ch1-office-narration.png"; do
     test -f "$f" || { echo "缺 $f" >&2; exit 1; }
   done
   mkdir -p "$OUTDIR/music"
@@ -49,7 +50,7 @@ if [ "$PL" = zh-CN ]; then
   NAME='KGB 阴谋'; T00='简体中文版'; S00='Cryo《KGB》CD 版（Conspiracy）'
   Q1='一个冷门经典的汉化请求'; Q1B='来自 bilibili 伙伴 索菲娅（ソフィア）'
   C02='开场字卡与字幕都换成中文'; C03='第一章　莫斯科，KGB P 处'; C04='对话菜单与回答都是中文'
-  C05='游标经过场景，动作提示也是中文'; GP='实机游玩：翻旁白、游标扫过办公室、和别洛夫交谈（2 倍速）'
+  C05='游标经过场景，动作提示也是中文'; GP='实机游玩（速度 100M）：翻旁白、游标扫过办公室、和别洛夫交谈（2 倍速）'; GS='工具栏「設定」：速度拉到最高 100M、快转 8×'
   C06='第二章　列宁格勒，戈斯季尼察饭店'; C07='第四章　码头，八月政变前夕'; C08='倒带重播时的框内信息'
   C09='片头名单跟着原版淡入淡出'; C10='片尾演员表'
   T11='繁中・简中・英文原版 随时切换'; S11='github.com/wicanr2/kgb-dosgolem　RRSAL-1.0　不附原版游戏'
@@ -60,7 +61,7 @@ else
   NAME='KGB 陰謀'; T00='繁體中文版'; S00='Cryo《KGB》CD 版（Conspiracy）'
   Q1='一個冷門經典的中文化請求'; Q1B='來自 bilibili 夥伴 索菲婭（ソフィア）'
   C02='開場字卡與字幕都換成中文'; C03='第一章　莫斯科，KGB P 處'; C04='對話選單與回答都是中文'
-  C05='動作選單與游標動詞，連圖片上的字也換成中文'; GP='實機遊玩：翻旁白、游標掃過辦公室、和別洛夫交談（2 倍速）'
+  C05='動作選單與游標動詞，連圖片上的字也換成中文'; GP='實機遊玩（速度 100M）：翻旁白、游標掃過辦公室、和別洛夫交談（2 倍速）'; GS='工具列「設定」：速度拉到最高 100M、快轉 8×'
   C06='第二章　列寧格勒，戈斯季尼察飯店'; C07='第四章　碼頭，八月政變前夕'; C08='倒帶重播時的框內訊息'
   C09='片頭名單跟著原版淡入淡出'; C10='片尾演員表'
   T11='繁中・简中・英文原版 隨時切換'; S11='github.com/wicanr2/kgb-dosgolem　RRSAL-1.0　不附原版遊戲'
@@ -108,6 +109,18 @@ gameplay() {  # 實機片段：2 倍速，放在與截圖頁相同的金框位�
     "[1:v]setpts=0.5*PTS,fps=$FPS[g];[0:v][g]overlay=160:14:shortest=1,fade=t=in:st=0:d=0.6,fade=t=out:st=$fo:d=0.6,format=yuv420p" \
     -t "$d" -r $FPS -threads 2 -filter_threads 1 -c:v libx264 -preset veryfast -pix_fmt yuv420p $T/05g.mp4
 }
+settings() {  # 視窗版補拍（tools/promo-settings.sh）：原速，960×660 縮進同一個金框，左右置中
+  convert -size ${W}x${H} "gradient:${BG1}-${BG2}" -fill "$GOLD" -draw "rectangle 157,11 1122,616" \
+    -fill '#000000' -draw "rectangle 160,14 1119,613" \
+    -fill '#000000b0' -draw "rectangle 0,628 ${W},720" \
+    -font "$FR" -fill "$CREAM" -gravity south -pointsize 36 -annotate +0+26 "$1" $T/gs-bg.png
+  local d fo
+  d=$(ffprobe -v error -show_entries format=duration -of csv=p=0 /extra/settings.mp4 | awk '{printf "%.2f", $1}')
+  fo=$(awk "BEGIN{print $d-0.6}")
+  ffmpeg -y -loglevel error -nostdin -loop 1 -i $T/gs-bg.png -i /extra/settings.mp4 -filter_complex \
+    "[1:v]scale=873:600,fps=$FPS[g];[0:v][g]overlay=203:14:shortest=1,fade=t=in:st=0:d=0.6,fade=t=out:st=$fo:d=0.6,format=yuv420p" \
+    -t "$d" -r $FPS -threads 2 -filter_threads 1 -c:v libx264 -preset veryfast -pix_fmt yuv420p $T/05s.mp4
+}
 
 card  $T/00.png "$NAME" "$T00" "$S00"
 quote $T/01.png "$Q1" "$Q1B"
@@ -126,7 +139,10 @@ quote $T/12.png "$Q12" "$Q12B" +0+130
 : > $T/list.txt
 for f in 00:6 01:5 02:6 03:6 04:5.5 05:5.5 06:5.5 07:5.5 08:5 09:5 10:5 11:6 12:4; do
   n=${f%%:*}; s=${f##*:}; clip $T/$n.png "$s"; echo "file '$T/$n.mp4'" >> $T/list.txt
-  if [ "$n" = 05 ]; then gameplay "$GP"; echo "file '$T/05g.mp4'" >> $T/list.txt; fi
+  if [ "$n" = 05 ]; then
+    gameplay "$GP"; echo "file '$T/05g.mp4'" >> $T/list.txt
+    settings "$GS"; echo "file '$T/05s.mp4'" >> $T/list.txt
+  fi
 done
 OUT="/dist/kgb-cht-${VERSION}-promo-${PL}.mp4"
 ffmpeg -y -loglevel error -nostdin -f concat -safe 0 -i $T/list.txt -c copy $T/silent.mp4
