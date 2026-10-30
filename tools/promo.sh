@@ -20,7 +20,7 @@ if [ "${1:-}" = gameplay ]; then
   test -f "$src/frames.rgb" && test -f "$src/frames.txt" || { echo "$src 缺 frames.rgb 或 frames.txt" >&2; exit 1; }
   read -r fw fh n < "$src/frames.txt"
   echo "畫格 ${fw}×${fh}，${n} 格"
-  # 錄製間隔 66,667 步、cycles 1000（每秒 100 萬步）＝每秒 15 格遊戲時間。
+  # 錄製間隔＝每秒指令數 ÷ 15，即每秒 15 格遊戲時間（速度 100M 時 6,666,667 步）。
   timeout 1200 docker run --rm -u "$(id -u):$(id -g)" --name "dgrs-promo-gp-$$" --network none \
     --memory 2g --cpus 2 --pids-limit 256 --log-opt max-size=10m --log-opt max-file=3 \
     -v "$src:/src:ro" -v "$OUTDIR/$lang:/out" kgb-cht-video:1 \
