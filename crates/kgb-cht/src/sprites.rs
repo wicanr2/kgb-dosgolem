@@ -77,7 +77,7 @@ pub struct Sprites {
     cursor_snap: Option<Vec<Vec<u8>>>,
     /// 開場字卡標籤（docs/spec/005 §5）。
     cards: Vec<Card>,
-    /// 顯示中的字卡：（標籤索引, 是否已上屏, 最後一次寫入的步數）。
+    /// 顯示中的字卡：（標籤索引, 是否已上屏, 最後一次寫入的週期時鐘）。
     card: Option<(usize, bool, u64)>,
     /// 簡中（否則繁中）。
     pub simplified: bool,
@@ -122,7 +122,7 @@ pub fn parse_cards(tsv: &str) -> Result<Vec<Card>, String> {
     Ok(out)
 }
 
-/// 相鄰寫入相差超過此步數視為新的一波（同 lifecycle::BURST_GAP）。
+/// 相鄰寫入相差超過此虛擬時間（週期時鐘）視為新的一波（同 lifecycle::BURST_GAP）。
 const CARD_GAP: u64 = crate::lifecycle::BURST_GAP;
 
 fn signature(m: &Machine, cs: u16, ip: u16, sig: &[u8]) -> bool {
@@ -189,8 +189,8 @@ impl Sprites {
         self.card.is_some()
     }
 
-    /// 一步之內對 A0000 的寫入：第一波寫到字卡矩形算上屏，之後新的一波就移除。
-    pub fn on_writes(&mut self, step: u64, hits: &[usize]) {
+    /// 一步之內對 A0000 的寫入：第一波寫到字卡矩形算上屏，之後新的一波就移除。`at` 為週期時鐘。
+    pub fn on_writes(&mut self, at: u64, hits: &[usize]) {
         let Some((i, committed, last)) = self.card else { return };
         let c = &self.cards[i];
         let touched = hits.iter().any(|&a| {
@@ -201,10 +201,10 @@ impl Sprites {
         if !touched {
             return;
         }
-        if committed && step > last + CARD_GAP {
+        if committed && at > last + CARD_GAP {
             self.card = None;
         } else {
-            self.card = Some((i, true, step));
+            self.card = Some((i, true, at));
         }
     }
 

@@ -74,6 +74,8 @@ fn hook_table() -> Box<[u64; 1024]> {
         crate::credits::LINE_AT,
         crate::takeover::BLOCK,
         crate::takeover::LINE,
+        HOVER_ON,
+        HOVER_OFF,
     ] {
         t[usize::from(ip >> 6)] |= 1 << (ip & 63);
     }
@@ -90,6 +92,11 @@ const SLOT_FILL: u16 = 0x56d5;
 const START_CHAPTER: u16 = 0x1bb9;
 /// 腳本變數程式 `4d19` 推完 bx、dx、di 的位置（`end_credits` 用，docs/spec/006 §4）。
 const END_CREDITS_AT: u16 = 0x4d1c;
+/// 熱區換色（docs/spec/004 §10）：反白 `03df`、還原 `041b` 的 `lcall [05AAh]`；簽章各自從 `03dd`、`0417` 起，映像內各一處。
+const HOVER_ON: u16 = 0x03df;
+const HOVER_OFF: u16 = 0x041b;
+const HOVER_ON_SIG: [u8; 6] = [0x8b, 0xc3, 0xff, 0x1e, 0xaa, 0x05];
+const HOVER_OFF_SIG: [u8; 8] = [0x8b, 0xc3, 0x86, 0xc4, 0xff, 0x1e, 0xaa, 0x05];
 /// mode 13h 畫面（320×200）的線性範圍。
 const SCREEN_WATCH: (usize, usize) = (0xa0000, 0xaf9ff);
 
@@ -161,6 +168,7 @@ impl Session {
                     self.end_credits = None;
                     self.m.cpu.ip = 0x4f82;
                 }
+                self.hover();
                 if !self.take.passthrough {
                     self.sprites.observe(&self.m);
                     self.sprites_due = self.sprites.next_due();
@@ -235,7 +243,12 @@ impl Session {
                 self.sync_watch();
             }
             if !self.m.bus.write_hits.is_empty() {
-                self.sprites.on_writes(self.m.cpu.steps, &self.m.bus.write_hits);
+                // 生命週期以虛擬時間分波（lifecycle::BURST_GAP）；選單列另比對 mode 13h 畫面內容（docs/spec/004 §5）。
+                let at = self.m.bus.cycles;
+                self.sprites.on_writes(at, &self.m.bus.write_hits);
+                let chained = self.m.bus.vga.mode == 0x13 && !self.m.bus.vga.planar();
+                let screen = chained.then(|| &self.m.bus.ram[0xa0000..0xa0000 + 64000]);
+                self.screen.on_writes(at, &self.m.bus.write_hits, screen);
                 if let Some((from, map)) = &mut self.writers {
                     if self.m.cpu.steps >= *from {
                         let e = map.entry(self.m.cpu.start).or_insert((0, self.m.cpu.steps, usize::MAX, 0));
@@ -246,12 +259,35 @@ impl Session {
                         }
                     }
                 }
-                self.screen.on_writes(self.m.cpu.steps, &self.m.bus.write_hits);
                 self.m.bus.write_hits.clear();
                 self.sync_watch();
             }
         }
         Ok(())
+    }
+
+    /// 熱區換色時改覆繪列的色號（docs/spec/004 §10）。
+    /// 只讀，不改 CPU 與記憶體。CS 已確認是 load segment，簽章不符時不動作。
+    fn hover(&mut self) {
+        let c = &self.m.cpu;
+        let (cs, ip) = (c.s[CS], c.ip);
+        let code = |off: u16, sig: &[u8]| {
+            sig.iter().enumerate().all(|(i, &b)| self.m.bus.ram[Cpu::address(cs, off.wrapping_add(i as u16)) & 0xfffff] == b)
+        };
+        let matched = match ip {
+            HOVER_ON => code(HOVER_ON - 2, &HOVER_ON_SIG),
+            HOVER_OFF => code(HOVER_OFF - 4, &HOVER_OFF_SIG),
+            _ => false,
+        };
+        if !matched {
+            return;
+        }
+        // DS:SI＝熱區記錄（x0, x1, y0, y1 各一字，含首尾）；驅動 0184h 把色號 AL 的像素換成 AH。
+        let (ds, si) = (c.s[DS], c.r[ferrogolem_core::cpu::SI]);
+        let w = |o: u16| usize::from(self.m.bus.word(Cpu::address(ds, si.wrapping_add(o))));
+        let zone = (w(0), w(2), w(4), w(6));
+        let (from, to) = (c.r[AX] as u8, (c.r[AX] >> 8) as u8);
+        self.screen.on_recolor(zone, from, to);
     }
 
     /// 追蹤 `53d8` 與 `56d5` 的進出（只讀，不改狀態）。CS 已確認是 load segment。
