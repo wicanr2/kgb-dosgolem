@@ -2,7 +2,7 @@
 
 《KGB 陰謀》是 Cryo《KGB》CD 版（片名 *Conspiracy*，光碟卷名 `CONSPIRACY`）的繁體中文與簡體中文化，簡中名《KGB 阴谋》。這款遊戲沒有官方中文名，中文名取自 CD 版的副名。遊戲跑在自有的 Rust DOS 模擬器 [FerroGolem](https://github.com/wicanr2/ferrogolem) 上；本庫攔下遊戲畫字的程式，跳過英文，把中文畫在放大 3 倍的高解析覆繪層。原版檔案一個位元組都不改。
 
-開場字幕、四章對白與旁白、說明影片字幕、選單、游標、片頭與片尾名單都已有中文，四章都在遊戲裡抽樣確認過。工具列可以隨時切換繁中、简中與英文原版。AdLib 配樂、音效與說明影片語音都有聲音，工具列可以靜音。
+開場字幕、四章對白與旁白、說明影片字幕、選單、游標、片頭與片尾名單都已有中文，四章都在遊戲裡抽樣確認過。工具列可以隨時切換繁中、简中與英文原版。AdLib 配樂、開場與說明影片的 Sound Blaster 語音都有聲音，工具列可以靜音。
 
 ![第一章：KGB P 處辦公室，進場旁白](docs/images/ch1-office-narration.png)
 
@@ -91,7 +91,7 @@ KGB 把英文畫在 320×200 的畫面上。直接改原版字串會碰到字寬
 |---|---|
 | 開場、四章、說明影片、選單、名單 | 有中文，四章與名單在遊戲裡抽樣確認 |
 | 繁中、简中、英文原版切換 | 可用 |
-| 聲音 | AdLib 配樂與 Sound Blaster 音效、語音已輸出；開場影片的數位聲音待查（[#3](https://github.com/wicanr2/kgb-dosgolem/issues/3)） |
+| 聲音 | AdLib 配樂與 Sound Blaster 語音已輸出，發行包在虛擬喇叭上錄到；待本機實聽（[#3](https://github.com/wicanr2/kgb-dosgolem/issues/3)） |
 | 物品插槽句（例：把 X 扔進水裡） | 未實測（[#5](https://github.com/wicanr2/kgb-dosgolem/issues/5)） |
 | 公開發行包 | 本機完整版可建，公開版未做（[#1](https://github.com/wicanr2/kgb-dosgolem/issues/1)、[#2](https://github.com/wicanr2/kgb-dosgolem/issues/2)） |
 

@@ -72,6 +72,8 @@ case "$cmd" in
     run="$WP/runs/$name"
     test ! -e "$run" || { echo "$run 已存在，換一個輸出名" >&2; exit 1; }
     mkdir -p "$run/scratch/KGB" "$WP/inputs"
+    # KGB_CFG＝設定檔路徑時照用（例如原版 CSP.CFG，字幕關閉）；否則新建並開字幕。
+    if [ -n "${KGB_CFG:-}" ]; then cp "$KGB_CFG" "$run/scratch/KGB/CSP.CFG"; fi
     new_cfg "$run/scratch/KGB"
     # KGB_LANG=zh-CN 時改用簡中譯文表、SC 字形（TTC 索引 2）與簡中圖塊標籤；預設繁中。
     lang="${KGB_LANG:-zh-TW}"; case "$lang" in zh-TW) fidx=3; simp=() ;; zh-CN) fidx=2; simp=(--simplified) ;; *) echo "KGB_LANG 只接受 zh-TW、zh-CN" >&2; exit 1 ;; esac

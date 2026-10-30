@@ -34,8 +34,8 @@
    "id": "audio-output",
    "layer": "frontend",
    "title": "音訊輸出：SB 樣本與 OPL 音樂",
-   "body": "FerroGolem 已有 Nuked OPL3 合成、SB 混音與 cpal 前端輸出（FerroGolem docs/spec/007）。無頭錄音 audio-opl2：開場、說明影片語音、片頭名單都有聲音，片頭名單的頻譜為多聲部配樂。剩下兩項：使用者在本機實聽；說明影片之前（cycles 1000 的前 337 秒，含開場影片）只有 AdLib、沒有 SB 樣本，要對拍 kgb-oracle 確認原版是否有數位聲音。",
-   "acceptance": "使用者實聽確認配樂與音效；開場影片的 SB 聲音與 kgb-oracle 一致。",
+   "body": "FerroGolem 已有 Nuked OPL3 合成、SB Pro 與 cpal 前端輸出（FerroGolem docs/spec/003 §6、007）。開場主角獨白原版沒有語音，萬尼亞叔叔的獨白與說明影片由 SB 播出（docs/re/007）。v1.1.1 Linux AppImage 在 PulseAudio 虛擬喇叭上錄到配樂與語音（tools/smoke-audio.sh，smoke-audio-v111）。剩使用者本機實聽。",
+   "acceptance": "使用者在本機實聽確認配樂與語音。",
    "verify": {
     "kind": "manual",
     "note": "#3；完成後改綁前端音訊測試"

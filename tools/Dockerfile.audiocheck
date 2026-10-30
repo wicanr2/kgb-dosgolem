@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: LicenseRef-RRSAL-1.0
+# 發行包聲音驗收（kgb-cht-audiocheck:1）：沿用 GUI 驗證映像（Xvfb、lavapipe，ID 見 tools/rust.sh 的 GUI_IMAGE，不修改它），
+# 加 PulseAudio 虛擬喇叭（有時鐘）與 ALSA 的 pulse 外掛，錄下前端實際送出的聲音。
+FROM dosgolem-rust-san5-gui-tools:1.99.1-r3
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends pulseaudio pulseaudio-utils libasound2-plugins \
+    && rm -rf /var/lib/apt/lists/*
+USER 1000

@@ -356,6 +356,11 @@ fn run(a: Args) -> Result<bool, String> {
         "irq7_delivered": s.m.irq7_delivered,
     });
     fs::write(a.out.join("report.json"), serde_json::to_string_pretty(&report).unwrap()).map_err(|e| e.to_string())?;
+    // 完整的開檔紀錄與最近的 seek（步數、handle、位置），供對照影片播放的區段。
+    let files: String = s.m.file_log.iter().map(|e| format!("{}\t{:02x}\t{}\t{}\n", e.step, e.ah, e.name, e.result)).collect();
+    fs::write(a.out.join("files.tsv"), format!("step\tah\tname\tresult\n{files}")).map_err(|e| e.to_string())?;
+    let seeks: String = s.m.seek_log.iter().map(|(st, h, p)| format!("{st}\t{h}\t{p}\n")).collect();
+    fs::write(a.out.join("seeks.tsv"), format!("step\thandle\tpos\n{seeks}")).map_err(|e| e.to_string())?;
     println!("executed={} events={} translated={} error={}", s.m.cpu.steps, s.events, s.translated, report["error"]);
     Ok(error.is_none())
 }
