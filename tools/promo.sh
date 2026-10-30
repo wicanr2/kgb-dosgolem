@@ -4,12 +4,29 @@
 # 在 kgb-cht-video 映像內合成（--network none、唯讀掛載截圖），輸出 dist-all/kgb-cht-<版本>-promo.mp4。
 # 音訊輸出尚未完成（issue #3），本版無配樂。
 #
-#   tools/promo.sh            用 docs/images/ 與 workplace/promo/shots/ 的截圖合成
+#   tools/promo.sh                     用 docs/images/ 與 workplace/promo/shots/ 的截圖合成
+#   tools/promo.sh gameplay <目錄>     把 kgb-run --frames 的 frames.rgb 編成 workplace/promo/shots/gameplay.mp4（實機片段，§15.3a）；
+#                                      合成時有這個檔就以 2 倍速插在動作選單之後
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUTDIR="$ROOT/workplace/promo"
-VERSION="$(git -C "$ROOT" describe --tags --always)"
+# 檔名用最近的版本標籤，與 dist-all 的完整版對齊。
+VERSION="$(git -C "$ROOT" describe --tags --abbrev=0)"
 mkdir -p "$OUTDIR/shots" "$ROOT/dist-all"
+if [ "${1:-}" = gameplay ]; then
+  src="$(cd "${2:?畫格目錄}" && pwd)"
+  test -f "$src/frames.rgb" && test -f "$src/frames.txt" || { echo "$src 缺 frames.rgb 或 frames.txt" >&2; exit 1; }
+  read -r fw fh n < "$src/frames.txt"
+  echo "畫格 ${fw}×${fh}，${n} 格"
+  # 錄製間隔 66,667 步、cycles 1000（每秒 100 萬步）＝每秒 15 格遊戲時間。
+  timeout 1200 docker run --rm -u "$(id -u):$(id -g)" --name "dgrs-promo-gp-$$" --network none \
+    --memory 2g --cpus 2 --pids-limit 256 --log-opt max-size=10m --log-opt max-file=3 \
+    -v "$src:/src:ro" -v "$OUTDIR/shots:/out" kgb-cht-video:1 \
+    ffmpeg -y -loglevel error -nostdin -f rawvideo -pix_fmt rgb24 -s "${fw}x${fh}" -r 15 -i /src/frames.rgb \
+      -threads 2 -c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p /out/gameplay.mp4
+  ls -la "$OUTDIR/shots/gameplay.mp4"
+  exit 0
+fi
 # 成品與完整版一起集中放 dist-all/（.gitignore），只留目前版本；檢查畫格留在 workplace/promo。
 rm -f "$ROOT/dist-all"/kgb-cht-*-promo.mp4
 test -f "$OUTDIR/shots/intro-card.png" || { echo "缺 $OUTDIR/shots/intro-card.png（開場字卡截圖）" >&2; exit 1; }
@@ -67,11 +84,26 @@ slide $T/10.png /img/credits-cast.png '片尾演員表'
 card  $T/11.png 'KGB 陰謀' '繁中・简中・英文原版 隨時切換' 'github.com/wicanr2/kgb-dosgolem　RRSAL-1.0　不附原版遊戲'
 quote $T/12.png '原版遊戲著作權屬 Cryo Interactive、Virgin Games 及其權利繼承者' "本片不含原版音樂　${VERSION}"
 
+gameplay() {  # 實機片段：2 倍速，放在與截圖頁相同的金框位置，下方字幕條
+  convert -size ${W}x${H} "gradient:${BG1}-${BG2}" -fill "$GOLD" -draw "rectangle 157,11 1122,616" \
+    -fill '#000000b0' -draw "rectangle 0,628 ${W},720" \
+    -font "$FR" -fill "$CREAM" -gravity south -pointsize 36 -annotate +0+26 "$1" $T/gp-bg.png
+  local d fo
+  d=$(ffprobe -v error -show_entries format=duration -of csv=p=0 /extra/gameplay.mp4 | awk '{printf "%.2f", $1/2}')
+  fo=$(awk "BEGIN{print $d-0.6}")
+  ffmpeg -y -loglevel error -nostdin -loop 1 -i $T/gp-bg.png -i /extra/gameplay.mp4 -filter_complex \
+    "[1:v]setpts=0.5*PTS,fps=$FPS[g];[0:v][g]overlay=160:14:shortest=1,fade=t=in:st=0:d=0.6,fade=t=out:st=$fo:d=0.6,format=yuv420p" \
+    -t "$d" -r $FPS -threads 2 -filter_threads 1 -c:v libx264 -preset veryfast -pix_fmt yuv420p $T/05g.mp4
+}
+
 : > $T/list.txt
 for f in 00:6 01:5 02:6 03:6 04:5.5 05:5.5 06:5.5 07:5.5 08:5 09:5 10:5 11:6 12:4; do
   n=${f%%:*}; s=${f##*:}; clip $T/$n.png "$s"; echo "file '$T/$n.mp4'" >> $T/list.txt
+  if [ "$n" = 05 ] && [ -f /extra/gameplay.mp4 ]; then
+    gameplay '實機遊玩：翻旁白、游標掃過辦公室、和別洛夫交談（2 倍速）'; echo "file '$T/05g.mp4'" >> $T/list.txt
+  fi
 done
 ffmpeg -y -loglevel error -nostdin -f concat -safe 0 -i $T/list.txt -c copy -movflags +faststart "/dist/kgb-cht-${VERSION}-promo.mp4"
-for t in 3 9 27 66; do ffmpeg -y -loglevel error -nostdin -ss $t -i "/dist/kgb-cht-${VERSION}-promo.mp4" -frames:v 1 "/out/check-$t.png"; done
+for t in 3 9 38 48 85; do ffmpeg -y -loglevel error -nostdin -ss $t -i "/dist/kgb-cht-${VERSION}-promo.mp4" -frames:v 1 "/out/check-$t.png"; done
 ffprobe -v error -show_entries format=duration -of csv=p=0 "/dist/kgb-cht-${VERSION}-promo.mp4"
 SCRIPT

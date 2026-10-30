@@ -73,6 +73,8 @@ pub struct Sprites {
     menus: Vec<Placed>,
     /// 最近一次畫游標：（步數, x, y, 圖塊編號）。
     cursor: Option<(u64, i32, i32, u16)>,
+    /// 游標畫完後，各標籤矩形在畫面（A0000）的色號快照；滑鼠靜止時遊戲不重畫游標，靠它判斷游標還在（docs/spec/005 §4）。
+    cursor_snap: Option<Vec<Vec<u8>>>,
     /// 開場字卡標籤（docs/spec/005 §5）。
     cards: Vec<Card>,
     /// 顯示中的字卡：（標籤索引, 是否已上屏, 最後一次寫入的步數）。
@@ -215,6 +217,14 @@ impl Sprites {
             self.menus.push(Placed { sprite: r[AX], x: r[CX] as i16 as i32, y: r[BX] as i16 as i32, step: m.cpu.steps, snap: None });
         } else if ip == CURSOR_DRAW && signature(m, cs, ip, &CURSOR_SIG) {
             self.cursor = Some((m.cpu.steps, r[CX] as i16 as i32, r[BX] as i16 as i32, word(0x4f15)));
+            self.cursor_snap = None;
+        }
+        if let (Some((at, x, y, sprite)), None) = (self.cursor, &self.cursor_snap) {
+            if m.cpu.steps >= at + DRAW_WINDOW && m.bus.vga.mode == 0x13 {
+                let screen = m.bus.vga.indexed13(&m.bus.ram[0xa0000..0xb0000]);
+                let rects = self.labels.iter().filter(|l| l.sprite == sprite);
+                self.cursor_snap = Some(rects.map(|l| rect(&screen, x + i32::from(l.x), y + i32::from(l.y), l.w, l.h)).collect());
+            }
         }
         // 圖塊畫完後，從離屏緩衝擷取各標籤矩形當快照。
         let pending = self.menus.iter().any(|p| p.snap.is_none() && m.cpu.steps >= p.step + DRAW_WINDOW);
@@ -267,8 +277,14 @@ impl Sprites {
             out.push(Patch { x: c.x, y: c.y, w: c.w, h: c.h, bg: dac[usize::from(bg)], fg: dac[usize::from(fg)], text });
         }
         if let Some((at, x, y, sprite)) = self.cursor {
-            if step.saturating_sub(at) <= ips / 10 && sprite >> 8 == 0 {
-                for l in labels.iter().filter(|l| l.sprite == sprite && (1..=11).contains(&sprite)) {
+            let ls: Vec<&Label> = labels.iter().filter(|l| l.sprite == sprite && (1..=11).contains(&sprite)).collect();
+            let shown = match &self.cursor_snap {
+                // 有快照：畫面上那塊還是原來的游標圖就一直畫（滑鼠靜止時遊戲不重畫）。
+                Some(snap) => snap.iter().zip(&ls).all(|(s, l)| matches(s, &rect(indexed, x + i32::from(l.x), y + i32::from(l.y), l.w, l.h))),
+                None => step.saturating_sub(at) <= ips / 10,
+            };
+            if shown && sprite >> 8 == 0 {
+                for l in ls {
                     let (lx, ly) = (x + i32::from(l.x), y + i32::from(l.y));
                     let (bg, fg) = bg_fg(&rect(indexed, lx, ly, l.w, l.h), dac);
                     out.push(Patch { x: lx, y: ly, w: i32::from(l.w), h: i32::from(l.h), bg: dac[usize::from(bg)], fg: dac[usize::from(fg)], text: text(l) });

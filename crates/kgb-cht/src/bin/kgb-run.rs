@@ -16,6 +16,8 @@
 //! 覆繪生命週期依 A0000 判斷，改了之後該次執行的覆繪不可信，只用於取證。
 //! `--chapter N` 取證用：第一次進入開章程式 `1bb9` 時以第 N 章開始（只改 AL，docs/re/006）。
 //! `--shot-at 步數,...` 只在這些步數存截圖（可與 `--shots` 並用）。
+//! `--frames 起:迄:間隔` 逐格輸出：範圍內每隔固定步數把合成畫面以 RGB24 附加到 frames.rgb（frames.txt 記寬、高、格數），
+//! 推廣影片的實機片段用。只讀畫面、不改遊戲狀態。每格 1.7 MB，先算格數。
 //! `--end-credits 步數` 取證用：過了這個步數後從腳本的片尾路徑播片尾名單（只改 IP，docs/spec/006 §4）。
 //! `--dump-ram 步數,...` 取證用：在這些步數把 1 MiB 記憶體寫成 ram-<步數>.bin（每檔 1 MiB，張數自己控制）。
 use ferrogolem_core::machine::DEFAULT_IPS;
@@ -47,6 +49,7 @@ struct Args {
     dump_ram: Vec<u64>,
     shot_at: Vec<u64>,
     end_credits: Option<u64>,
+    frames: Option<(u64, u64, u64)>,
 }
 
 enum Action {
@@ -86,7 +89,7 @@ fn parse() -> Result<Args, String> {
     let (mut input, mut trace_phrases, mut trace_writers, mut watch, mut trace_driver) = (None, false, None, None, None);
     let mut trace_at = Vec::new();
     let (mut labels, mut simplified, mut chapter, mut dump_ram) = (None, false, None, Vec::new());
-    let (mut shot_at, mut end_credits) = (Vec::new(), None);
+    let (mut shot_at, mut end_credits, mut frames) = (Vec::new(), None, None);
     while let Some(k) = it.next() {
         let mut v = || it.next().ok_or(format!("{k} 需要值"));
         match k.as_str() {
@@ -123,6 +126,14 @@ fn parse() -> Result<Args, String> {
                 dump_ram.sort_unstable();
             }
             "--end-credits" => end_credits = Some(v()?.parse().map_err(|e| format!("--end-credits：{e}"))?),
+            "--frames" => {
+                let r = v()?;
+                let p: Vec<u64> = r.split(':').map(|x| x.parse().map_err(|e| format!("--frames：{e}"))).collect::<Result<_, _>>()?;
+                match p[..] {
+                    [from, to, every] if every > 0 && from <= to => frames = Some((from, to, every)),
+                    _ => return Err("--frames 格式為 起:迄:間隔（步數，間隔大於 0）".into()),
+                }
+            }
             "--shot-at" => {
                 for x in v()?.split(',') {
                     shot_at.push(x.parse().map_err(|e| format!("--shot-at：{e}"))?);
@@ -161,6 +172,7 @@ fn parse() -> Result<Args, String> {
         dump_ram,
         shot_at,
         end_credits,
+        frames,
     })
 }
 
@@ -202,10 +214,18 @@ fn run(a: Args) -> Result<bool, String> {
     let mut pending = inputs.iter().peekable();
     let mut dumps = a.dump_ram.iter().peekable();
     let mut shots_at = a.shot_at.iter().peekable();
+    // 逐格輸出（推廣影片的實機片段，§15.3a）：[起, 迄] 內每隔固定步數把合成畫面以 RGB24 附加到 frames.rgb。
+    let mut next_frame = a.frames.map(|(from, _, _)| from);
+    let mut frames_out = match a.frames {
+        Some(_) => Some(std::io::BufWriter::new(fs::File::create(a.out.join("frames.rgb")).map_err(|e| e.to_string())?)),
+        None => None,
+    };
+    let mut frame_count = 0u64;
     while s.m.cpu.steps < a.steps && !s.m.exited && error.is_none() {
         let target = pending.peek().map_or(next, |(st, _)| (*st).min(next)).min(a.steps);
         let target = dumps.peek().map_or(target, |&&d| d.min(target));
         let target = shots_at.peek().map_or(target, |&&d| d.min(target));
+        let target = next_frame.map_or(target, |f| f.min(target));
         if let Err(e) = s.run_until(target) {
             error = Some(e);
         }
@@ -216,6 +236,18 @@ fn run(a: Args) -> Result<bool, String> {
             while shots_at.next_if(|&&d| d <= s.m.cpu.steps).is_some() {}
             let (w, h, rgb) = s.compose(glyphs.as_mut());
             fs::write(a.out.join(format!("shot-{:010}.png", s.m.cpu.steps)), encode_rgb(w, h, &rgb)).map_err(|e| e.to_string())?;
+        }
+        if let (Some(f), Some((_, to, every)), Some(w)) = (next_frame, a.frames, frames_out.as_mut()) {
+            if s.m.cpu.steps >= f {
+                use std::io::Write as _;
+                let (fw, fh, rgb) = s.compose(glyphs.as_mut());
+                if (fw, fh) != (kgb_cht::overlay::W, kgb_cht::overlay::H) {
+                    return Err(format!("第 {} 步畫面不是 {}×{}，逐格輸出要固定尺寸", s.m.cpu.steps, kgb_cht::overlay::W, kgb_cht::overlay::H));
+                }
+                w.write_all(&rgb).map_err(|e| e.to_string())?;
+                frame_count += 1;
+                next_frame = Some(f + every).filter(|&n| n <= to);
+            }
         }
         while let Some((_, act)) = pending.next_if(|(st, _)| *st <= s.m.cpu.steps) {
             match *act {
@@ -235,6 +267,12 @@ fn run(a: Args) -> Result<bool, String> {
         } else if a.shots == 0 && s.m.cpu.steps >= next {
             next = a.steps;
         }
+    }
+    if let Some(mut w) = frames_out {
+        use std::io::Write as _;
+        w.flush().map_err(|e| e.to_string())?;
+        fs::write(a.out.join("frames.txt"), format!("{} {} {frame_count}\n", kgb_cht::overlay::W, kgb_cht::overlay::H))
+            .map_err(|e| e.to_string())?;
     }
     fs::write(a.out.join("events.tsv"), &s.log).map_err(|e| e.to_string())?;
     if let Some((_, log)) = &s.trace_at {
