@@ -8,6 +8,7 @@
 //!
 //! 譯文目錄下的 `*.zh-TW.tsv` 給繁中、`*.zh-CN.tsv` 給簡中；字型取 TTC 的 TC（3）與 SC（2）。
 //! 同目錄的 `sprite-labels.tsv` 是圖塊文字標籤表（docs/spec/005）。
+use ferrogolem_core::audio::Mixer;
 use ferrogolem_core::machine::DEFAULT_IPS;
 use ferrogolem_frontend::{Guest, UiFont, egui, run};
 use kgb_cht::catalog::Catalog;
@@ -28,6 +29,8 @@ struct Kgb {
     lang: Lang,
     /// 各中文版本；目前語言的譯文表在 Session 裡，這裡留空。
     texts: Vec<Text>,
+    /// AdLib 與 SB 混音（FerroGolem docs/spec/007）。
+    mixer: Mixer,
 }
 
 impl Kgb {
@@ -76,6 +79,9 @@ impl Guest for Kgb {
             self.s.events,
             self.s.translated
         )
+    }
+    fn audio(&mut self) -> Vec<i16> {
+        self.mixer.render(&mut self.s.m.bus)
     }
     fn toolbar(&mut self, ui: &mut egui::Ui) {
         ui.separator();
@@ -153,7 +159,7 @@ fn main_inner() -> Result<(), String> {
     }
     // 介面字用 TC；Noto Sans CJK 每個 collection 都含繁簡字形，「简中」照樣顯示。
     let ui = UiFont { bytes: std::fs::read(&font).map_err(|e| e.to_string())?, index: 3 };
-    run("KGB 陰謀（FerroGolem）", [960.0, 660.0], Some(ui), Box::new(Kgb { s, lang, texts }))
+    run("KGB 陰謀（FerroGolem）", [960.0, 660.0], Some(ui), Box::new(Kgb { s, lang, texts, mixer: Mixer::new() }))
 }
 
 fn main() -> ExitCode {

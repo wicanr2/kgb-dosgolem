@@ -84,12 +84,14 @@ stage_common() {  # $1＝資料根目錄（放 text/、font/、original/ 與文�
 
 stage_docs() {  # $1＝放文件的目錄
   cp "$ROOT/LICENSE" "$1/LICENSE.txt"
+  cp "$FG_ROOT/crates/nuked-opl3/COPYING.LGPL" "$1/nuked-opl3-COPYING.LGPL.txt"
   cat > "$1/讀我.txt" <<EOF
 《KGB 陰謀》（Cryo《KGB》CD 版 Conspiracy）中文化 $VERSION（本機完整版，內含原版資料，請勿散布）
 
 執行：直接開啟 $NAME（Windows 為 $NAME.exe；macOS 為 KGB-CHT.app，第一次請按右鍵選「打開」）。
 工具列可切換 繁中、简中、英文原版。存檔放在使用者資料目錄的 kgb-cht/save。
-模擬器：FerroGolem $FG_COMMIT。授權：自有程式 RRSAL-1.0（LICENSE.txt）；字型 Noto Sans CJK，SIL OFL 1.1（font/）。
+模擬器：FerroGolem $FG_COMMIT。授權：自有程式 RRSAL-1.0（LICENSE.txt）；字型 Noto Sans CJK，SIL OFL 1.1（font/）；
+AdLib 合成器 nuked-opl3（Nuked OPL3 移植），LGPL-2.1-or-later（nuked-opl3-COPYING.LGPL.txt，例外條款見 LICENSE.txt 第 2 條 (d)）。
 原版遊戲著作權屬 Cryo Interactive、Virgin Games 及其權利繼承者；本專案與其無隸屬或授權關係。
 EOF
 }

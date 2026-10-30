@@ -16,6 +16,7 @@
 //! 覆繪生命週期依 A0000 判斷，改了之後該次執行的覆繪不可信，只用於取證。
 //! `--chapter N` 取證用：第一次進入開章程式 `1bb9` 時以第 N 章開始（只改 AL，docs/re/006）。
 //! `--shot-at 步數,...` 只在這些步數存截圖（可與 `--shots` 並用）。
+//! `--wav` 以 FerroGolem 混音器（AdLib＋SB）錄下原版聲音，依虛擬時間對齊寫成 audio.wav（44,100 Hz 立體聲）。
 //! `--frames 起:迄:間隔` 逐格輸出：範圍內每隔固定步數把合成畫面以 RGB24 附加到 frames.rgb（frames.txt 記寬、高、格數），
 //! 推廣影片的實機片段用。只讀畫面、不改遊戲狀態。每格 1.7 MB，先算格數。
 //! `--end-credits 步數` 取證用：過了這個步數後從腳本的片尾路徑播片尾名單（只改 IP，docs/spec/006 §4）。
@@ -50,6 +51,7 @@ struct Args {
     shot_at: Vec<u64>,
     end_credits: Option<u64>,
     frames: Option<(u64, u64, u64)>,
+    wav: bool,
 }
 
 enum Action {
@@ -89,7 +91,7 @@ fn parse() -> Result<Args, String> {
     let (mut input, mut trace_phrases, mut trace_writers, mut watch, mut trace_driver) = (None, false, None, None, None);
     let mut trace_at = Vec::new();
     let (mut labels, mut simplified, mut chapter, mut dump_ram) = (None, false, None, Vec::new());
-    let (mut shot_at, mut end_credits, mut frames) = (Vec::new(), None, None);
+    let (mut shot_at, mut end_credits, mut frames, mut wav) = (Vec::new(), None, None, false);
     while let Some(k) = it.next() {
         let mut v = || it.next().ok_or(format!("{k} 需要值"));
         match k.as_str() {
@@ -126,6 +128,7 @@ fn parse() -> Result<Args, String> {
                 dump_ram.sort_unstable();
             }
             "--end-credits" => end_credits = Some(v()?.parse().map_err(|e| format!("--end-credits：{e}"))?),
+            "--wav" => wav = true,
             "--frames" => {
                 let r = v()?;
                 let p: Vec<u64> = r.split(':').map(|x| x.parse().map_err(|e| format!("--frames：{e}"))).collect::<Result<_, _>>()?;
@@ -173,6 +176,7 @@ fn parse() -> Result<Args, String> {
         shot_at,
         end_credits,
         frames,
+        wav,
     })
 }
 
@@ -221,13 +225,29 @@ fn run(a: Args) -> Result<bool, String> {
         None => None,
     };
     let mut frame_count = 0u64;
+    // 原版聲音：FerroGolem 的混音器（AdLib＋SB，FerroGolem docs/spec/007）每 0.1 秒產生一次，
+    // 依虛擬時間對齊，結束時寫 44,100 Hz 立體聲 16 位元的 audio.wav。另記 SB 取樣率的變化（audio-rates.tsv）。
+    let mut mixer = ferrogolem_core::audio::Mixer::new();
+    let mut wav_data: Vec<i16> = Vec::new();
+    let mut wav_rates: Vec<(u64, u64)> = Vec::new();
     while s.m.cpu.steps < a.steps && !s.m.exited && error.is_none() {
         let target = pending.peek().map_or(next, |(st, _)| (*st).min(next)).min(a.steps);
         let target = dumps.peek().map_or(target, |&&d| d.min(target));
         let target = shots_at.peek().map_or(target, |&&d| d.min(target));
         let target = next_frame.map_or(target, |f| f.min(target));
+        let target = if a.wav { target.min(s.m.cpu.steps + (s.m.ips / 10).max(1)) } else { target };
         if let Err(e) = s.run_until(target) {
             error = Some(e);
+        }
+        if a.wav {
+            if !s.m.bus.dac_out.is_empty() {
+                let (num, den) = s.m.bus.sb.rate;
+                let rate = (num / den.max(1)).max(1);
+                if wav_rates.last().map(|&(_, r)| r) != Some(rate) {
+                    wav_rates.push((s.m.cpu.steps, rate));
+                }
+            }
+            wav_data.extend(mixer.render(&mut s.m.bus));
         }
         while let Some(&d) = dumps.next_if(|&&d| d <= s.m.cpu.steps) {
             fs::write(a.out.join(format!("ram-{d:010}.bin")), &s.m.bus.ram).map_err(|e| e.to_string())?;
@@ -267,6 +287,29 @@ fn run(a: Args) -> Result<bool, String> {
         } else if a.shots == 0 && s.m.cpu.steps >= next {
             next = a.steps;
         }
+    }
+    if a.wav {
+        let rate = ferrogolem_core::audio::RATE;
+        let n = (wav_data.len() * 2) as u32;
+        let mut h = Vec::with_capacity(44 + n as usize);
+        h.extend_from_slice(b"RIFF");
+        h.extend_from_slice(&(36 + n).to_le_bytes());
+        h.extend_from_slice(b"WAVEfmt ");
+        h.extend_from_slice(&16u32.to_le_bytes());
+        h.extend_from_slice(&1u16.to_le_bytes()); // PCM
+        h.extend_from_slice(&2u16.to_le_bytes()); // 立體聲
+        h.extend_from_slice(&rate.to_le_bytes());
+        h.extend_from_slice(&(rate * 4).to_le_bytes()); // 每秒位元組
+        h.extend_from_slice(&4u16.to_le_bytes());
+        h.extend_from_slice(&16u16.to_le_bytes());
+        h.extend_from_slice(b"data");
+        h.extend_from_slice(&n.to_le_bytes());
+        for s in &wav_data {
+            h.extend_from_slice(&s.to_le_bytes());
+        }
+        fs::write(a.out.join("audio.wav"), h).map_err(|e| e.to_string())?;
+        let rates: String = wav_rates.iter().map(|(st, r)| format!("{st}\t{r}\n")).collect();
+        fs::write(a.out.join("audio-rates.tsv"), format!("step\trate\n{rates}")).map_err(|e| e.to_string())?;
     }
     if let Some(mut w) = frames_out {
         use std::io::Write as _;

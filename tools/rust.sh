@@ -73,14 +73,16 @@ case "$cmd" in
     test ! -e "$run" || { echo "$run 已存在，換一個輸出名" >&2; exit 1; }
     mkdir -p "$run/scratch/KGB" "$WP/inputs"
     new_cfg "$run/scratch/KGB"
-    tsv=(); for f in "$ROOT"/text/*.zh-TW.tsv; do test -f "$f" && tsv+=(--tsv "/text/$(basename "$f")"); done
+    # KGB_LANG=zh-CN 時改用簡中譯文表、SC 字形（TTC 索引 2）與簡中圖塊標籤；預設繁中。
+    lang="${KGB_LANG:-zh-TW}"; case "$lang" in zh-TW) fidx=3; simp=() ;; zh-CN) fidx=2; simp=(--simplified) ;; *) echo "KGB_LANG 只接受 zh-TW、zh-CN" >&2; exit 1 ;; esac
+    tsv=(); for f in "$ROOT"/text/*."$lang".tsv; do test -f "$f" && tsv+=(--tsv "/text/$(basename "$f")"); done
     timeout 3600 docker run --rm -u "$(id -u):$(id -g)" --name "dgrs-kgb-$name" \
       --memory 3g --cpus 1 --pids-limit 64 --network none \
       --log-opt max-size=10m --log-opt max-file=3 \
       -v "$WP/target/release:/tool:ro" -v "$WP/disc/cd:/game:ro" -v "$ROOT/text:/text:ro" \
       -v "$font_dir:/fonts:ro" -v "$WP/inputs:/inputs:ro" -v "$run:/run" "$IMAGE" \
       /tool/kgb-run --root /game --scratch /run/scratch --out /run/out --steps "$steps" \
-      --font /fonts/NotoSansCJK-Medium.ttc --font-index 3 "${tsv[@]}" --labels /text/sprite-labels.tsv "${extra[@]}"
+      --font /fonts/NotoSansCJK-Medium.ttc --font-index "$fidx" "${tsv[@]}" --labels /text/sprite-labels.tsv "${simp[@]}" "${extra[@]}"
     ;;
   play)
     # 在本機 X11 桌面開視窗玩。存檔留在 workplace/play/scratch。

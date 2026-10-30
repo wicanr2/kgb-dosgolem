@@ -34,8 +34,8 @@
    "id": "audio-output",
    "layer": "frontend",
    "title": "音訊輸出：SB 樣本與 OPL 音樂",
-   "body": "FerroGolem 前端沒有音訊輸出：SB DMA 樣本累積在 bus.dac_out 後丟棄，OPL 只模擬狀態暫存器。核心改動在 FerroGolem。",
-   "acceptance": "開場影片、說明影片語音與場景音樂可聽；無頭模式可輸出 WAV 比對。",
+   "body": "FerroGolem 已有 Nuked OPL3 合成、SB 混音與 cpal 前端輸出（FerroGolem docs/spec/007）。無頭錄音 audio-opl2：開場、說明影片語音、片頭名單都有聲音，片頭名單的頻譜為多聲部配樂。剩下兩項：使用者在本機實聽；說明影片之前（cycles 1000 的前 337 秒，含開場影片）只有 AdLib、沒有 SB 樣本，要對拍 kgb-oracle 確認原版是否有數位聲音。",
+   "acceptance": "使用者實聽確認配樂與音效；開場影片的 SB 聲音與 kgb-oracle 一致。",
    "verify": {
     "kind": "manual",
     "note": "#3；完成後改綁前端音訊測試"
