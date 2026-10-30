@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: LicenseRef-RRSAL-1.0
+# macOS 交叉編譯映像：crazymax/osxcross 的工具鏈需要 glibc 2.38 以上，Debian bookworm 基底跑不起來，
+# 所以另用 Ubuntu 24.04，並以 rustup 安裝與共用基底相同的 Rust 1.99.1。
+# 只在本機使用：osxcross 內含 macOS SDK，其授權不允許散布，本映像不推送、不上傳。
+# 建置：tools/package.sh image（需要網路）。
+FROM crazymax/osxcross:15.5-debian AS osxcross
+
+FROM ubuntu:24.04
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends clang lld ca-certificates curl file zip \
+ && rm -rf /var/lib/apt/lists/*
+COPY --from=osxcross /osxcross /osxcross
+RUN echo /osxcross/lib > /etc/ld.so.conf.d/osxcross.conf && ldconfig
+ENV RUSTUP_HOME=/usr/local/rustup CARGO_HOME=/usr/local/cargo PATH=/osxcross/bin:/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+RUN curl -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --profile minimal --default-toolchain 1.99.1 \
+      --target x86_64-apple-darwin --target aarch64-apple-darwin \
+ && chmod -R a+rX /usr/local/rustup /usr/local/cargo
+USER 1000:1000

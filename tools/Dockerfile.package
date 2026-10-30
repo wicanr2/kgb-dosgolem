@@ -1,16 +1,10 @@
 # SPDX-License-Identifier: LicenseRef-RRSAL-1.0
-# 發行打包用映像：在共用基底 dosgolem-rust-sc 之上加 Windows（mingw-w64）與 macOS（osxcross）交叉工具鏈、
-# squashfs（AppImage）。只在本機使用：osxcross 內含 macOS SDK，其授權不允許散布，本映像不推送、不上傳。
-# 建置：tools/package.sh image（唯一需要網路的一步）。
-FROM crazymax/osxcross:15.5-debian AS osxcross
-
+# 發行打包用映像（Linux、Windows）：在共用基底 dosgolem-rust-sc 之上加 mingw-w64 與 squashfs（AppImage）。
+# macOS 用 tools/Dockerfile.macos。建置：tools/package.sh image（需要網路）。
 FROM dosgolem-rust-sc:1.99.1-r1
 USER root
 RUN apt-get update \
- && apt-get install -y --no-install-recommends clang lld mingw-w64 squashfs-tools file zip \
+ && apt-get install -y --no-install-recommends mingw-w64 squashfs-tools file zip \
  && rm -rf /var/lib/apt/lists/*
-COPY --from=osxcross /osxcross /osxcross
-RUN echo /osxcross/lib > /etc/ld.so.conf.d/osxcross.conf && ldconfig
-ENV PATH="/osxcross/bin:${PATH}"
-RUN rustup target add x86_64-pc-windows-gnu x86_64-apple-darwin aarch64-apple-darwin
+RUN rustup target add x86_64-pc-windows-gnu
 USER 1000:1000

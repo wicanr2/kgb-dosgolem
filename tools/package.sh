@@ -13,7 +13,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WP="$ROOT/workplace"
 FG_ROOT="${FG_ROOT:-$(cd "$ROOT/../ferrogolem" 2>/dev/null && pwd)}"
-PKG_IMAGE="kgb-cht-pkg:1.99.1-r1"
+PKG_IMAGE="kgb-cht-pkg:1.99.1-r2"
+MAC_IMAGE="kgb-cht-mac:1.99.1-r1"
 FONT_SRC=/usr/share/fonts/opentype/noto/NotoSansCJK-Medium.ttc
 FONT_LICENSE=/usr/share/doc/fonts-noto-cjk/copyright
 # AppImage type2 runtime：第一次 image 時下載到 workplace/cache，之後只核對雜湊。
@@ -26,13 +27,13 @@ NAME=kgb-cht
 die() { echo "package.sh：$*" >&2; exit 1; }
 need() { test -e "$1" || die "缺 $1"; }
 
-run_pkg() {  # 在打包映像內執行（離線、非 root、資源上限）。
+run_pkg() {  # 在打包映像（IMG 可換成 macOS 映像）內執行（離線、非 root、資源上限）。
   timeout 3600 docker run --rm -u "$(id -u):$(id -g)" --name "dgrs-pkg-$$" \
     --network none --memory 8g --cpus 6 --pids-limit 1024 \
     --log-opt max-size=10m --log-opt max-file=3 \
     -e CARGO_HOME=/cache -e CARGO_TARGET_DIR=/target -e HOME=/tmp -e MACOSX_DEPLOYMENT_TARGET=$MACOS_MIN \
     -v "$WP/cargo:/cache" -v "$WP/target-pkg:/target" -v "$FG_ROOT:/ferrogolem:ro" -v "$ROOT:/project:ro" \
-    -w /project "$PKG_IMAGE" bash -c "$1"
+    -w /project "${IMG:-$PKG_IMAGE}" bash -c "$1"
 }
 
 preflight() {
@@ -42,7 +43,7 @@ preflight() {
     git -C "$r" fetch -q origin 2>/dev/null || true
     git -C "$r" branch -r --contains HEAD | grep -q . || die "$r 的 HEAD 尚未推送"
   done
-  docker image inspect "$PKG_IMAGE" >/dev/null 2>&1 || die "缺映像 $PKG_IMAGE，先跑 tools/package.sh image"
+  for i in "$PKG_IMAGE" "$MAC_IMAGE"; do docker image inspect "$i" >/dev/null 2>&1 || die "缺映像 $i，先跑 tools/package.sh image"; done
   need "$FONT_SRC"; need "$FONT_LICENSE"
   need "$WP/disc/cd/CSPPRG.EXE"; need "$WP/disc/CSP.CFG"; need "$WP/disc/manifest.json"
   test "$(sha256sum "$WP/disc/cd/CSPPRG.EXE" | cut -c1-64)" = d2fb547ec2516328915a320fcc2ea2330457533a8ae222e1c9821d56f5aac47c \
@@ -64,7 +65,9 @@ build() {  # $1＝rust target
     x86_64-apple-darwin) env='CARGO_TARGET_X86_64_APPLE_DARWIN_LINKER=x86_64-apple-$OSXCROSS_TARGET-clang CC_x86_64_apple_darwin=x86_64-apple-$OSXCROSS_TARGET-clang' ;;
     aarch64-apple-darwin) env='CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=arm64-apple-$OSXCROSS_TARGET-clang CC_aarch64_apple_darwin=arm64-apple-$OSXCROSS_TARGET-clang' ;;
   esac
-  run_pkg "export OSXCROSS_TARGET=\$(osxcross-conf 2>/dev/null | sed -n 's/^export OSXCROSS_TARGET=//p'); env $env \
+  local img=$PKG_IMAGE
+  case "$t" in *-apple-darwin) img=$MAC_IMAGE ;; esac
+  IMG=$img run_pkg "export OSXCROSS_TARGET=\$(osxcross-conf 2>/dev/null | sed -n 's/^export OSXCROSS_TARGET=//p'); env $env \
     cargo build --release --locked --offline -p kgb-cht --bin kgb-play --target $t"
 }
 
@@ -128,7 +131,7 @@ macos() {
   local app="$OUT/macos/KGB-CHT.app/Contents"
   mkdir -p "$app/MacOS" "$app/Resources"
   timeout 600 docker run --rm -u "$(id -u):$(id -g)" --name "dgrs-pkg-lipo-$$" --network none --memory 1g --cpus 1 --pids-limit 64 \
-    --log-opt max-size=10m --log-opt max-file=3 -v "$WP/target-pkg:/target:ro" -v "$app/MacOS:/out" "$PKG_IMAGE" bash -c \
+    --log-opt max-size=10m --log-opt max-file=3 -v "$WP/target-pkg:/target:ro" -v "$app/MacOS:/out" "$MAC_IMAGE" bash -c \
     "T=x86_64-apple-\$(osxcross-conf | sed -n 's/^export OSXCROSS_TARGET=//p'); \$T-lipo -create \
       /target/x86_64-apple-darwin/release/kgb-play /target/aarch64-apple-darwin/release/kgb-play -output /out/$NAME"
   stage_common "$app/Resources"; stage_docs "$app/Resources"
@@ -153,17 +156,21 @@ EOF
 verify() {  # 架構與內容檢查
   local f
   timeout 600 docker run --rm -u "$(id -u):$(id -g)" --name "dgrs-pkg-v-$$" --network none --memory 2g --cpus 2 --pids-limit 128 \
-    --log-opt max-size=10m --log-opt max-file=3 -v "$OUT:/out:ro" -v "$WP/target-pkg:/target:ro" "$PKG_IMAGE" bash -c '
+    --log-opt max-size=10m --log-opt max-file=3 -v "$WP/target-pkg:/target:ro" "$PKG_IMAGE" bash -c '
+    set -e
+    if test -f /target/x86_64-unknown-linux-gnu/release/kgb-play; then file /target/x86_64-unknown-linux-gnu/release/kgb-play | grep -q "ELF 64-bit"; fi
+    if test -f /target/x86_64-pc-windows-gnu/release/kgb-play.exe; then file /target/x86_64-pc-windows-gnu/release/kgb-play.exe | grep -q "PE32+"; fi
+    echo Linux、Windows 架構檢查通過'
+  timeout 600 docker run --rm -u "$(id -u):$(id -g)" --name "dgrs-pkg-vm-$$" --network none --memory 2g --cpus 2 --pids-limit 128 \
+    --log-opt max-size=10m --log-opt max-file=3 -v "$WP/target-pkg:/target:ro" "$MAC_IMAGE" bash -c '
     set -e
     T=x86_64-apple-$(osxcross-conf 2>/dev/null | sed -n "s/^export OSXCROSS_TARGET=//p")
-    test -f /target/x86_64-unknown-linux-gnu/release/kgb-play && file /target/x86_64-unknown-linux-gnu/release/kgb-play | grep -q "ELF 64-bit"
-    test -f /target/x86_64-pc-windows-gnu/release/kgb-play.exe && file /target/x86_64-pc-windows-gnu/release/kgb-play.exe | grep -q "PE32+"
     for a in x86_64 aarch64; do test -f /target/$a-apple-darwin/release/kgb-play || continue
       file /target/$a-apple-darwin/release/kgb-play | grep -q Mach-O
       $T-otool -L /target/$a-apple-darwin/release/kgb-play | tail -n +2 | awk "{print \$1}" | grep -vE "^(/usr/lib/|/System/Library/)" && exit 1 || true
     done
-    test -f /target/aarch64-apple-darwin/release/kgb-play && { $T-otool -l /target/aarch64-apple-darwin/release/kgb-play | grep -q LC_CODE_SIGNATURE; }
-    echo 架構檢查通過'
+    if test -f /target/aarch64-apple-darwin/release/kgb-play; then $T-otool -l /target/aarch64-apple-darwin/release/kgb-play | grep -q LC_CODE_SIGNATURE; fi
+    echo macOS 架構檢查通過'
   for f in "$OUT"/*; do
     case "$f" in
       *.zip) unzip -l "$f" | grep -q "original/cd/CSPPRG.EXE" || die "$f 缺原版" ; unzip -l "$f" | grep -q "text/chapter4.zh-TW.tsv" || die "$f 缺譯文" ;;
@@ -175,7 +182,9 @@ verify() {  # 架構與內容檢查
 
 case "${1:-}" in
   image)
-    docker build -f "$ROOT/tools/Dockerfile.package" -t "$PKG_IMAGE" "$ROOT/tools"
+    # buildkit 的 DNS 會解析到連不上的 Fastly 位址（2026-10-30），建置改走主機網路。
+    docker build --network host -f "$ROOT/tools/Dockerfile.package" -t "$PKG_IMAGE" "$ROOT/tools"
+    docker build --network host -f "$ROOT/tools/Dockerfile.macos" -t "$MAC_IMAGE" "$ROOT/tools"
     mkdir -p "$WP/cache"
     test -f "$RUNTIME" || timeout 300 docker run --rm -u "$(id -u):$(id -g)" --name "dgrs-pkg-dl-$$" --network bridge \
       --memory 512m --cpus 1 --pids-limit 64 --log-opt max-size=10m --log-opt max-file=3 -v "$WP/cache:/out" "$PKG_IMAGE" \
