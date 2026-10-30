@@ -38,8 +38,11 @@ run_pkg() {  # 在打包映像（IMG 可換成 macOS 映像）內執行（離線
 
 preflight() {
   test "$(git -C "$ROOT" config user.email)" = wicanr2@gmail.com || die "git 身分不是 wicanr2@gmail.com"
+  # 包要對得上標籤：已追蹤檔案不得有變更；未追蹤檔案只在會進建置或打包的目錄內才擋
+  # （repo 根目錄的個人筆記之類不影響產物）。
   for r in "$ROOT" "$FG_ROOT"; do
-    test -z "$(git -C "$r" status --porcelain)" || die "$r 有未提交的變更"
+    test -z "$(git -C "$r" status --porcelain --untracked-files=no)" || die "$r 有未提交的變更"
+    test -z "$(git -C "$r" ls-files --others --exclude-standard -- crates text tools font)" || die "$r 的建置目錄有未追蹤檔案"
     git -C "$r" fetch -q origin 2>/dev/null || true
     git -C "$r" branch -r --contains HEAD | grep -q . || die "$r 的 HEAD 尚未推送"
   done
