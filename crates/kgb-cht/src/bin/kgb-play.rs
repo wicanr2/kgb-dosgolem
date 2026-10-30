@@ -153,7 +153,7 @@ fn main_inner() -> Result<(), String> {
     }
     // 介面字用 TC；Noto Sans CJK 每個 collection 都含繁簡字形，「简中」照樣顯示。
     let ui = UiFont { bytes: std::fs::read(&font).map_err(|e| e.to_string())?, index: 3 };
-    run("KGB 中文版（FerroGolem）", [960.0, 660.0], Some(ui), Box::new(Kgb { s, lang, texts }))
+    run("KGB 陰謀（FerroGolem）", [960.0, 660.0], Some(ui), Box::new(Kgb { s, lang, texts }))
 }
 
 fn main() -> ExitCode {

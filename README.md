@@ -1,6 +1,6 @@
-# kgb-dosgolem：KGB 中文化
+# KGB 陰謀（kgb-dosgolem）
 
-Cryo《KGB》CD 版（片名 *Conspiracy*，光碟卷名 `CONSPIRACY`）的繁體中文與簡體中文化。遊戲跑在自有的 Rust DOS 模擬器 [FerroGolem](https://github.com/wicanr2/ferrogolem) 上；本庫攔下遊戲畫字的程式，跳過英文，把中文畫在放大 3 倍的高解析覆繪層。原版檔案一個位元組都不改。
+《KGB 陰謀》是 Cryo《KGB》CD 版（片名 *Conspiracy*，光碟卷名 `CONSPIRACY`）的繁體中文與簡體中文化，簡中名《KGB 阴谋》。這款遊戲沒有官方中文名，中文名取自 CD 版的副名。遊戲跑在自有的 Rust DOS 模擬器 [FerroGolem](https://github.com/wicanr2/ferrogolem) 上；本庫攔下遊戲畫字的程式，跳過英文，把中文畫在放大 3 倍的高解析覆繪層。原版檔案一個位元組都不改。
 
 開場字幕、四章對白與旁白、說明影片字幕、選單、游標、片頭與片尾名單都已有中文，四章都在遊戲裡抽樣確認過。工具列可以隨時切換繁中、简中與英文原版。聲音還沒有輸出。
 

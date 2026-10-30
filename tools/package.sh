@@ -85,7 +85,7 @@ stage_common() {  # $1＝資料根目錄（放 text/、font/、original/ 與文�
 stage_docs() {  # $1＝放文件的目錄
   cp "$ROOT/LICENSE" "$1/LICENSE.txt"
   cat > "$1/讀我.txt" <<EOF
-KGB（Cryo，1992，CD 版 CONSPIRACY）繁體中文化 $VERSION（本機完整版，內含原版資料，請勿散布）
+《KGB 陰謀》（Cryo《KGB》CD 版 Conspiracy）中文化 $VERSION（本機完整版，內含原版資料，請勿散布）
 
 執行：直接開啟 $NAME（Windows 為 $NAME.exe；macOS 為 KGB-CHT.app，第一次請按右鍵選「打開」）。
 工具列可切換 繁中、简中、英文原版。存檔放在使用者資料目錄的 kgb-cht/save。
@@ -103,7 +103,7 @@ linux() {
   stage_common "$share"; stage_docs "$share"
   printf '#!/bin/sh\nexec "$(dirname "$(readlink -f "$0")")/usr/bin/%s" "$@"\n' "$NAME" > "$app/AppRun"
   chmod +x "$app/AppRun"
-  printf '[Desktop Entry]\nType=Application\nName=KGB 中文版\nExec=%s\nIcon=%s\nCategories=Game;\n' "$NAME" "$NAME" > "$app/$NAME.desktop"
+  printf '[Desktop Entry]\nType=Application\nName=KGB 陰謀\nExec=%s\nIcon=%s\nCategories=Game;\n' "$NAME" "$NAME" > "$app/$NAME.desktop"
   need "$RUNTIME"
   test "$(sha256sum "$RUNTIME" | cut -c1-64)" = "$RUNTIME_SHA256" || die "AppImage runtime 雜湊不符"
   # mksquashfs 要寫輸出目錄，另以可寫掛載執行（run_pkg 的專案掛載是唯讀）。
@@ -141,7 +141,7 @@ macos() {
 <plist version="1.0"><dict>
 <key>CFBundleExecutable</key><string>$NAME</string>
 <key>CFBundleIdentifier</key><string>io.github.wicanr2.kgb-cht</string>
-<key>CFBundleName</key><string>KGB 中文版</string>
+<key>CFBundleName</key><string>KGB 陰謀</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>${VERSION#v}</string>
 <key>LSMinimumSystemVersion</key><string>$MACOS_MIN</string>
