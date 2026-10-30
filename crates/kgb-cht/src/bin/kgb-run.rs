@@ -16,6 +16,7 @@
 //! 覆繪生命週期依 A0000 判斷，改了之後該次執行的覆繪不可信，只用於取證。
 //! `--chapter N` 取證用：第一次進入開章程式 `1bb9` 時以第 N 章開始（只改 AL，docs/re/006）。
 //! `--shot-at 步數,...` 只在這些步數存截圖（可與 `--shots` 並用）。
+//! `--end-credits 步數` 取證用：過了這個步數後從腳本的片尾路徑播片尾名單（只改 IP，docs/spec/006 §4）。
 //! `--dump-ram 步數,...` 取證用：在這些步數把 1 MiB 記憶體寫成 ram-<步數>.bin（每檔 1 MiB，張數自己控制）。
 use ferrogolem_core::machine::DEFAULT_IPS;
 use ferrogolem_core::png::encode_rgb;
@@ -45,6 +46,7 @@ struct Args {
     chapter: Option<u8>,
     dump_ram: Vec<u64>,
     shot_at: Vec<u64>,
+    end_credits: Option<u64>,
 }
 
 enum Action {
@@ -84,7 +86,7 @@ fn parse() -> Result<Args, String> {
     let (mut input, mut trace_phrases, mut trace_writers, mut watch, mut trace_driver) = (None, false, None, None, None);
     let mut trace_at = Vec::new();
     let (mut labels, mut simplified, mut chapter, mut dump_ram) = (None, false, None, Vec::new());
-    let mut shot_at = Vec::new();
+    let (mut shot_at, mut end_credits) = (Vec::new(), None);
     while let Some(k) = it.next() {
         let mut v = || it.next().ok_or(format!("{k} 需要值"));
         match k.as_str() {
@@ -120,6 +122,7 @@ fn parse() -> Result<Args, String> {
                 }
                 dump_ram.sort_unstable();
             }
+            "--end-credits" => end_credits = Some(v()?.parse().map_err(|e| format!("--end-credits：{e}"))?),
             "--shot-at" => {
                 for x in v()?.split(',') {
                     shot_at.push(x.parse().map_err(|e| format!("--shot-at：{e}"))?);
@@ -157,6 +160,7 @@ fn parse() -> Result<Args, String> {
         chapter,
         dump_ram,
         shot_at,
+        end_credits,
     })
 }
 
@@ -177,6 +181,7 @@ fn run(a: Args) -> Result<bool, String> {
         }
     }
     s.start_chapter = a.chapter;
+    s.end_credits = a.end_credits;
     if !a.trace_at.is_empty() {
         s.trace_at = Some((a.trace_at.clone(), String::from("step\tat\tret\tregs\n")));
     }

@@ -42,17 +42,6 @@
    }
   },
   {
-   "id": "end-credits",
-   "layer": "kgb",
-   "title": "片尾名單實測",
-   "body": "spec 006 的接手點與片頭共用，片頭（GENEA）已實測（credits-zh1、credits-zh2）。片尾（GENEZ，含演員表與頭像 # T）只在破關後播放，尚未實測；譯文已列在 text/credits.zh-TW.tsv。",
-   "acceptance": "破關後片尾名單的職稱與角色名以中文顯示，頭像位置不被遮住。",
-   "verify": {
-    "kind": "manual",
-    "note": "#4；需要第四章結尾的存檔或觸發路徑"
-   }
-  },
-  {
    "id": "composite-blocks",
    "layer": "kgb",
    "title": "框內訊息與物品插槽組句",

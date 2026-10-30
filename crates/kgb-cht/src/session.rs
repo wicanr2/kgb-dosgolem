@@ -40,6 +40,10 @@ pub struct Session {
     /// 取證用：第一次進入開章程式 `1bb9` 時把 AL 改成這一章，
     /// 只改暫存器，讓遊戲自己的開章程式載入該章（docs/re/006）。用一次即清除。
     pub start_chapter: Option<u8>,
+    /// 取證用：過了這個步數後，第一次在腳本變數程式 `4d19` 推完 bx、dx、di（`4d1c`）時跳到
+    /// `4f82`，即腳本值 F0h 的片尾路徑（`658b`、`231e`、`8924`，經 `50ff` 收尾，堆疊對稱）。
+    /// 只改 IP（docs/spec/006 §4）。
+    pub end_credits: Option<u64>,
     /// 片頭與片尾名單（docs/spec/006）。
     pub credits: crate::credits::Credits,
     /// 進行中的 `53d8`、`56d5` 呼叫。
@@ -88,6 +92,7 @@ impl Session {
             driver_log: None,
             trace_at: None,
             start_chapter: None,
+            end_credits: None,
             credits: Default::default(),
             frames: Vec::new(),
             segments: HashMap::new(),
@@ -103,6 +108,10 @@ impl Session {
                     if let Some(n) = self.start_chapter.take() {
                         self.m.cpu.set8(0, n);
                     }
+                }
+                if self.m.cpu.ip == 0x4d1c && self.end_credits.is_some_and(|at| self.m.cpu.steps >= at) {
+                    self.end_credits = None;
+                    self.m.cpu.ip = 0x4f82;
                 }
                 if !self.take.passthrough {
                     self.sprites.observe(&self.m);

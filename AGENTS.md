@@ -43,6 +43,7 @@ tools/rust.sh gui-check <輸出名> <秒數>  # Xvfb＋lavapipe 無頭跑視窗�
 - 核心的移植來源與署名在 FerroGolem 的 `external/`。
 - rust-dos（GPL-2.0-or-later）只當外部行為對照。不複製、不翻寫、不連結其程式碼。
 - 原版 zip、ISO、解出的檔案、EXE、存檔、影片、音訊、字型、截圖、RAM 快照一律不進 Git。推送前用 `git ls-files` 複查。
+- 例外（使用者 2026-10-30 定案）：README 用的少量中文化截圖放 `docs/images/`，比照其他中文化專案。只收 3 倍覆繪的中文化畫面，縮成網頁尺寸，每張附說明來源與狀態的 caption；不收原版英文畫面、影片畫格與手冊。
 - 不可散布的字型（倚天，`~/cht/etan_font`）只用於本機。發行版用可散布字型。
 - 本專案與 Cryo Interactive、Virgin Games 及其權利繼承者沒有隸屬或授權關係。
 
