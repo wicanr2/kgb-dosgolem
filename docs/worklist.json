@@ -1,21 +1,44 @@
 {
  "schema": "dosgolem-rs-worklist/1",
- "note": "verify 為真＝仍未完成。只掃產品程式碼（crates/、tools/），不掃測試。用 tools/worklist.py 執行。",
+ "note": "verify 為真＝仍未完成。只掃產品程式碼（crates/、tools/），不掃測試。用 tools/worklist.py 執行。每條對應 wicanr2/kgb-dosgolem 的一個 issue（verify.note 開頭的 #N）。",
  "layers": {
   "core": "自有核心缺的平台服務，KGB 正常啟動會撞到",
   "kgb": "KGB 適配、格式與中文化",
-  "frontend": "玩家可操作的前端"
+  "frontend": "玩家可操作的前端",
+  "release": "發行打包與發行前驗證"
  },
  "items": [
   {
-   "id": "ida-text-routines",
-   "layer": "kgb",
-   "title": "以 IDA 交叉驗證文字 routine",
-   "body": "86e9、87d8、2c40、驅動 51e0:12d1 目前以 objdump 讀記憶體傾印取證。",
-   "acceptance": "IDA 資料庫由已記錄雜湊的傾印建立，逐項確認 docs/spec/004 §2。",
+   "id": "release-package",
+   "layer": "release",
+   "title": "發行打包：tools/package.sh",
+   "body": "尚未開始。單一腳本在 Docker 內建 Linux AppImage、Windows zip、macOS universal .app；含譯文表、可散布字型、授權、啟動器（original/ 匯入）與外洩掃描（~/cht/AGENTS_DOSGOLEM_CHT.md §15.1）。",
+   "acceptance": "三個平台的包都能建出，架構與內容檢查通過；外洩掃描有負對照。",
    "verify": {
     "kind": "manual",
-    "note": "完成後改綁 docs/re 的 IDA 收據"
+    "note": "#1；完成後改綁 tools/package.sh 的存在與自檢"
+   }
+  },
+  {
+   "id": "release-smoke",
+   "layer": "release",
+   "title": "發行包冒煙測試與實機截圖",
+   "body": "尚未開始。以包內 text/ 與字型跑三個語言通道的冒煙測試，含缺譯文表的負對照；AppImage 解出後在 Xvfb 冷開機截圖目視（§15.2）。",
+   "acceptance": "冒煙 PASS、負對照 FAIL，截圖目視無缺字與誤譯。",
+   "verify": {
+    "kind": "manual",
+    "note": "#2；依賴 release-package"
+   }
+  },
+  {
+   "id": "audio-output",
+   "layer": "frontend",
+   "title": "音訊輸出：SB 樣本與 OPL 音樂",
+   "body": "FerroGolem 前端沒有音訊輸出：SB DMA 樣本累積在 bus.dac_out 後丟棄，OPL 只模擬狀態暫存器。核心改動在 FerroGolem。",
+   "acceptance": "開場影片、說明影片語音與場景音樂可聽；無頭模式可輸出 WAV 比對。",
+   "verify": {
+    "kind": "manual",
+    "note": "#3；完成後改綁前端音訊測試"
    }
   },
   {
@@ -26,18 +49,29 @@
    "acceptance": "破關後片尾名單的職稱與角色名以中文顯示，頭像位置不被遮住。",
    "verify": {
     "kind": "manual",
-    "note": "需要第四章結尾的存檔或觸發路徑"
+    "note": "#4；需要第四章結尾的存檔或觸發路徑"
    }
   },
   {
    "id": "composite-blocks",
    "layer": "kgb",
-   "title": "多片語組成的文字區塊",
-   "body": "已實作（spec 004 §7、§8）：片語段相接、結尾標點以字幹查、插槽範本（38 個不重複範本，插槽填名稱、遞迴片語或預設代名詞，冠詞略去）。第一章辦公室懸停的地點列（檢視辦公室、窗戶、畫像、地圖）與物品欄自我描述已實機驗證（ex-scan3、ex-office6）。未驗證：動作選單（3d37→3e10，87d8 單行，未接手）、框內訊息（7727，未接手）、FAh 物品插槽的實機組句。",
-   "acceptance": "動作選單與框內訊息接手後以中文顯示，物品插槽句（例：把 X 放進 Y）實機組句正確；以第一章實機事件收據驗證。",
+   "title": "框內訊息與物品插槽組句",
+   "body": "已實作並實機驗證（spec 004 §7、§8；spec 005）：片語段相接、插槽範本、地點列、物品欄描述、動作與物品選單（圖塊覆繪）。未驗證：框內訊息（腳本事件佇列 [5534] 第 8 號指令 764a，於 7727 呼叫 86e9、返回 772a，未接手、歷次執行未遇到）、FAh 物品插槽的實機組句。",
+   "acceptance": "框內訊息接手後以中文顯示，物品插槽句（例：把 X 放進 Y）實機組句正確，各有實機事件收據。",
    "verify": {
     "kind": "manual",
-    "note": "規格完成後改綁"
+    "note": "#5；規格完成後改綁"
+   }
+  },
+  {
+   "id": "ida-text-routines",
+   "layer": "kgb",
+   "title": "以 IDA 交叉驗證文字 routine 與名單、開章程式",
+   "body": "86e9、87d8、2c40、驅動 51e0:12d1、名單程式 89d6–8a2e、開章程式 1bb9 目前以 objdump 讀記憶體傾印取證。",
+   "acceptance": "IDA 資料庫由已記錄雜湊的傾印建立，逐項確認 docs/spec/004 §2、spec 006 §2、docs/re/006 §2。",
+   "verify": {
+    "kind": "manual",
+    "note": "#6；完成後改綁 docs/re 的 IDA 收據"
    }
   }
  ]
