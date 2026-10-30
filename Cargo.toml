@@ -6,7 +6,7 @@ members = ["crates/kgb-cht"]
 edition = "2024"
 license = "LicenseRef-RRSAL-1.0"
 authors = ["Wang Chun-Yu <wicanr2@gmail.com>"]
-repository = "https://github.com/wicanr2/dosgolem-rs"
+repository = "https://github.com/wicanr2/kgb-dosgolem"
 
 [profile.dev]
 debug = 0

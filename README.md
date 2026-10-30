@@ -1,4 +1,4 @@
-# dosgolem-rs：KGB 中文化
+# kgb-dosgolem：KGB 中文化
 
 把 Cryo《KGB》CD 版（Conspiracy）在執行期中文化，分繁中（台灣用語）與簡中（大陸用語）兩個版本。遊戲跑在自有的 Rust DOS 模擬器 [FerroGolem](../ferrogolem)（另一個 repo）上，本庫接手遊戲的文字 routine，跳過英文繪字，把中文畫在放大 3 倍的覆繪層。
 

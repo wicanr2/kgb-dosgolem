@@ -56,3 +56,4 @@
 - 系統選單（下方最左面板）：重新開始、讀取、儲存、選項、離開與選項子選單全部已有譯文（ex-sys1、ex-sys6）。存檔後的存讀檔列帶執行期欄位（「Save Game 1, Used, your office , Rating 1」），新增樣式列（spec 004 §9，`text/patterns.zh-TW.tsv`），欄位中的地點查譯文、數字原樣（ex-sys4b、ex-sys5b）。
 - 第二到四章翻譯完成：`kgb-extract --chapter` 取出 CHAP2A、CHAP3U、CHAP4U 的片語（含片語表外的掃描段），分 20、3、6 批由 sonnet 子代理分三波翻譯，說明影片 THA2–THA4 172 句另一批。每波後統一譯名：亞克、聯絡官、「割喉客」、中情局、殺人實錄影片、「維克托·馬茨涅夫號」（船名加引號，比照「極地熱忱號」）、列舍托夫、戈盧別夫、綠色房間、衛國戰爭街；德文台詞保留德文；第四章病人妄想身處 1918 年內戰，Soviet 改譯「蘇維埃」。第二章 1980 漏一個 `^`，合併檢查擋下後補回。專名一致性掃描（英文含譯名表條目時譯文是否用表上譯名）只剩「中蘇邊境」「反蘇」「天哪」與研究所全名等合理例外。
 - `merge_translations.py` 加既有譯文表參數：同一語言的譯文表一起載入，跨檔重複 key 會讓載入失敗，已收的 key 不再輸出。以第一章自我比對驗證（3,506 列全數命中）；實際上第二到四章彼此與第一章都沒有重疊。繁中、簡中全部譯文表以 kgb-run 載入（loadtest、loadtest-cn）沒有重複 key、沒有缺字。第 4 章第 6 批子代理違反「不執行程式」的邊界，以 Bash 唯讀驗證交付檔，沒有寫入其他檔。
+- GitHub repo 由 `wicanr2/dosgolem-rs` 改名為 `wicanr2/kgb-dosgolem`（使用者授權，2026-10-30），與其他 `<遊戲>-dosgolem` 專案命名一致；本機 remote、README、AGENTS.md、Cargo.toml 同步更新，LICENSE 作品名與 worklist schema 名稱未改。

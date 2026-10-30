@@ -1,4 +1,4 @@
-# dosgolem-rs 工作契約（KGB 中文化）
+# kgb-dosgolem 工作契約（KGB 中文化）
 
 本專案以執行期覆繪把 Cryo《KGB》CD 版（光碟卷名 `CONSPIRACY`）繁體中文化，授權 RRSAL-1.0。模擬器是另一個 repo FerroGolem（`~/cht/ferrogolem`），本庫只放 KGB 的取證、文字接手、譯文與覆繪。只做中文化：不做 remake，不做 matching decompilation，不改遊戲規則。
 
@@ -27,7 +27,7 @@ tools/rust.sh gui-check <輸出名> <秒數>  # Xvfb＋lavapipe 無頭跑視窗�
 
 - 模擬器（2026-10-29 改定）：另開 repo FerroGolem，clean-room、RRSAL，以 MVP 方式先讓 KGB 可玩，比照 dosgolem-rust-san5。核心已從本庫搬過去，契約見 `~/cht/ferrogolem/AGENTS.md`。本庫依賴它，不再放核心程式。
 - 對拍基準：`~/cht/dosgolem-rust` 分支 `kgb-oracle`（rust-dos）。不再執行 Go dosgolem。
-- 儲存庫：本機目錄 `~/cht/kgb`，私人 GitHub `wicanr2/dosgolem-rs`。使用者已授權建立。
+- 儲存庫：本機目錄 `~/cht/kgb`，私人 GitHub `wicanr2/kgb-dosgolem`（2026-10-30 由 `dosgolem-rs` 改名，舊網址自動轉址）。使用者已授權建立與改名。
 - 兩個中文版本（2026-10-29，取代同日的「兩岸共同用語」）：繁中（zh-TW，台灣用語）與簡中（zh-CN，大陸用語）。翻譯只產繁中；簡中由 OpenCC `tw2sp` 從繁中轉換，再以 `text/glossary.tsv` 的簡中欄覆寫專名，產物進版控、工具可重生比對。細則見 `text/TRANSLATING.md`。
 - 語言選單（2026-10-29）：工具列可選繁中、簡中、英文原版（關閉接手與覆繪、原版照畫）。預設依系統語系：zh-TW、zh-HK、zh-MO 為繁中，zh-CN、zh-SG 為簡中，其他語系預設繁中。
 - 試作第 1 批的譯文風格使用者已確認（2026-10-29）。
