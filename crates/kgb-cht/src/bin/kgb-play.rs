@@ -4,6 +4,7 @@
 //!
 //! kgb-play --root <原版唯讀> --scratch <暫存層，需含 KGB\CSP.CFG>
 //!          --text <譯文目錄> --font <Noto Sans CJK ttc> [--lang zh-TW|zh-CN|en] [--cycles 20000]
+//! 不帶 --root 時是發行包模式：從執行檔旁找 text/、font/、original/，存檔放使用者資料目錄。
 //!
 //! 譯文目錄下的 `*.zh-TW.tsv` 給繁中、`*.zh-CN.tsv` 給簡中；字型取 TTC 的 TC（3）與 SC（2）。
 //! 同目錄的 `sprite-labels.tsv` 是圖塊文字標籤表（docs/spec/005）。
@@ -117,6 +118,19 @@ fn main_inner() -> Result<(), String> {
             }
             _ => return Err(format!("未知參數 {k}")),
         }
+    }
+    // 發行包：不帶 --root 時從執行檔位置找包內的譯文、字型與原版，存檔放使用者資料目錄（kgb_cht::install）。
+    if root.is_none() {
+        use kgb_cht::install;
+        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let base = install::find_base(exe.parent().ok_or("執行檔沒有上層目錄")?).ok_or("找不到包內的 text/ 目錄")?;
+        let l = install::layout(&base);
+        let data = install::data_dir(std::env::consts::OS, |k| std::env::var(k).ok()).ok_or("找不到使用者資料目錄")?;
+        let (cd, save) = install::prepare(&l, &data)?;
+        root = Some(cd);
+        scratch = scratch.or(Some(save));
+        text = text.or(Some(l.text));
+        font = font.or(Some(l.font));
     }
     let (text, font) = (text.ok_or("缺 --text")?, font.ok_or("缺 --font")?);
     let lang = lang.unwrap_or_else(|| Lang::from_env(|k| std::env::var(k).ok()));

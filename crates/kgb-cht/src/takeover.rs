@@ -7,9 +7,9 @@ use ferrogolem_core::machine::Machine;
 pub const BLOCK: u16 = 0x86e9;
 pub const LINE: u16 = 0x87d8;
 /// 接手（跳過原版繪字）的呼叫點；其他呼叫點只記錄、原版照畫（docs/spec/004 §3）。
-/// 2ce8 開場字幕、1d97 章節標題列、52a0 地點標籤、584f 旁白、3e13 對話選單。
+/// 2ce8 開場字幕、1d97 章節標題列、52a0 地點標籤、584f 旁白、3e13 對話選單、772a 重播時的框內訊息（`7727`）。
 /// 時鐘 86b3 用特殊數字字型，不接手。
-pub const TAKEN_SITES: [u16; 5] = [0x2ce8, 0x1d97, 0x52a0, 0x584f, 0x3e13];
+pub const TAKEN_SITES: [u16; 6] = [0x2ce8, 0x1d97, 0x52a0, 0x584f, 0x3e13, 0x772a];
 /// 呼叫端依英文寬度置中的單行呼叫點（docs/spec/004 §3）。
 const CENTERED_SITES: [u16; 1] = [0x3e13];
 /// `86e9` 內部呼叫 `87d8` 後的返回偏移。

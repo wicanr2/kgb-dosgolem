@@ -3,6 +3,7 @@
 //! 遊戲專屬的偏移與簽章只放在這裡，通用核心不認識 KGB。
 pub mod catalog;
 pub mod credits;
+pub mod install;
 pub mod lang;
 pub mod lifecycle;
 pub mod overlay;
