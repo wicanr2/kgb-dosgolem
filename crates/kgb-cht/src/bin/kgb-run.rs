@@ -240,7 +240,7 @@ fn run(a: Args) -> Result<bool, String> {
             error = Some(e);
         }
         if a.wav {
-            if !s.m.bus.dac_out.is_empty() {
+            if !s.m.bus.sb_out.is_empty() {
                 let (num, den) = s.m.bus.sb.rate;
                 let rate = (num / den.max(1)).max(1);
                 if wav_rates.last().map(|&(_, r)| r) != Some(rate) {
