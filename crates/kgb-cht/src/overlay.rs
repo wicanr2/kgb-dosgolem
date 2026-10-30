@@ -174,6 +174,12 @@ fn line_bitmap(g: &mut Glyphs, text: &str, px: u32) -> LineBitmap {
 }
 
 fn draw_text(g: &mut Glyphs, out: &mut [u8], text: &str, x: i32, top: i32, px: u32, rgb: [u8; 3]) {
+    draw_text_faded(g, out, text, x, top, px, rgb, 255)
+}
+
+/// 同 `draw_text`，整行（字與描邊）再乘上不透明度 `fade`（255＝不透明）。
+#[allow(clippy::too_many_arguments)]
+fn draw_text_faded(g: &mut Glyphs, out: &mut [u8], text: &str, x: i32, top: i32, px: u32, rgb: [u8; 3], fade: u8) {
     let pad = OUTLINE_RADIUS.ceil() as i32 + 2;
     if !g.lines.contains_key(&(text.to_string(), px)) {
         let b = line_bitmap(g, text, px);
@@ -184,7 +190,7 @@ fn draw_text(g: &mut Glyphs, out: &mut [u8], text: &str, x: i32, top: i32, px: u
     for (layer, color) in [(&b.outline, [0, 0, 0]), (&b.alpha, rgb)] {
         for cy in 0..ch {
             for cx in 0..cw {
-                let a = layer[cy * cw + cx];
+                let a = (u16::from(layer[cy * cw + cx]) * u16::from(fade) / 255) as u8;
                 let (ox, oy) = (x - pad + cx as i32, top - pad + cy as i32);
                 if a == 0 || ox < 0 || oy < 0 || ox >= W as i32 || oy >= H as i32 {
                     continue;
@@ -239,6 +245,28 @@ fn draw_patch(g: &mut Glyphs, out: &mut [u8], p: &Patch) {
             }
             blend(out, (oy as usize * W + ox as usize) * 3, p.fg, a);
         }
+    }
+}
+
+/// 名單的一行（docs/spec/006）：原版 320×200 座標的中心 x 與頂端 y，不透明度 0–255。
+#[derive(Clone, Debug, PartialEq)]
+pub struct CreditLine {
+    pub cx: i32,
+    pub y: i32,
+    pub text: String,
+    pub alpha: u8,
+}
+
+/// 名單原版字高（像素）。
+const CREDIT_HEIGHT: u32 = 14;
+
+/// 在已合成的畫面上畫名單行：置中、黑色圓角描邊，字色 rgb，整行乘上各自的不透明度。
+pub fn draw_credits(g: &mut Glyphs, out: &mut [u8], lines: &[CreditLine], rgb: [u8; 3]) {
+    let px = CREDIT_HEIGHT * SCALE as u32;
+    for l in lines {
+        let lw: i32 = l.text.chars().map(|c| g.advance(c, px)).sum();
+        let x = l.cx * SCALE as i32 - lw / 2;
+        draw_text_faded(g, out, &l.text, x, l.y * SCALE as i32, px, rgb, l.alpha);
     }
 }
 

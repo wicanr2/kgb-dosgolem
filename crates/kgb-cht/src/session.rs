@@ -40,6 +40,8 @@ pub struct Session {
     /// 取證用：第一次進入開章程式 `1bb9` 時把 AL 改成這一章，
     /// 只改暫存器，讓遊戲自己的開章程式載入該章（docs/re/006）。用一次即清除。
     pub start_chapter: Option<u8>,
+    /// 片頭與片尾名單（docs/spec/006）。
+    pub credits: crate::credits::Credits,
     /// 進行中的 `53d8`、`56d5` 呼叫。
     frames: Vec<Frame>,
     /// 各區塊（ES, DI）已完成的片語與插槽範圍（docs/spec/004 §7、§8）。
@@ -86,6 +88,7 @@ impl Session {
             driver_log: None,
             trace_at: None,
             start_chapter: None,
+            credits: Default::default(),
             frames: Vec::new(),
             segments: HashMap::new(),
         })
@@ -103,6 +106,9 @@ impl Session {
                 }
                 if !self.take.passthrough {
                     self.sprites.observe(&self.m);
+                    if self.credit_hook() {
+                        continue;
+                    }
                 }
                 if let Some((at, log)) = &mut self.trace_at {
                     let c = &self.m.cpu;
@@ -236,6 +242,50 @@ impl Session {
     }
 
     /// 原版 320×200 時合成 3 倍中文覆繪，其他模式原樣回傳。
+    /// 名單（docs/spec/006）：`89e8` 記中心 x；`8a07` 讀本行、模擬 `pop dx`、跳到 `8a26`
+    /// 略過英文繪字。改了 IP 時回傳 true。
+    fn credit_hook(&mut self) -> bool {
+        use crate::credits::{CENTER_AT, LINE_AT, NEXT_LINE, key, plain};
+        use ferrogolem_core::cpu::{CX, DX, SI};
+        let ip = self.m.cpu.ip;
+        if ip == CENTER_AT {
+            self.credits.center = self.m.cpu.r[DI];
+            return false;
+        }
+        if ip != LINE_AT {
+            return false;
+        }
+        let c = &self.m.cpu;
+        let (ds, si, y) = (c.s[DS], c.r[SI], c.r[CX]);
+        let mut en = Vec::new();
+        for i in 0..200u16 {
+            let b = self.m.bus.ram[Cpu::address(ds, si.wrapping_add(i))];
+            if b < 0x20 {
+                break;
+            }
+            en.push(b);
+        }
+        let (ss, sp) = (c.s[SS], c.r[SP]);
+        let mode = self.m.bus.word(Cpu::address(ss, sp));
+        self.m.cpu.r[DX] = mode;
+        self.m.cpu.r[SP] = sp.wrapping_add(2);
+        self.m.cpu.ip = NEXT_LINE;
+        let k = key(&en);
+        let (zh, found) = match self.catalog.get(&k) {
+            Some(z) => (z.to_string(), true),
+            None => (plain(&en), false),
+        };
+        self.events += 1;
+        self.translated += u64::from(found);
+        let _ = writeln!(
+            self.log,
+            "{}\tCredit\t{:04x}\t{}\t{}\t1\t14\t25\t{}\t{}\t1\t0\t{:04x}",
+            self.m.cpu.steps, LINE_AT, self.credits.center, y, u8::from(found), key_of(&k), mode
+        );
+        self.credits.show(i32::from(y), zh, mode);
+        true
+    }
+
     pub fn compose(&mut self, glyphs: Option<&mut Glyphs>) -> (usize, usize, Vec<u8>) {
         let (w, h, rgb) = self.m.bus.rgb();
         match (glyphs, w, h) {
@@ -247,7 +297,12 @@ impl Session {
                     let indexed = self.m.bus.vga.indexed13(&self.m.bus.ram[0xa0000..0xb0000]);
                     self.sprites.patches(&indexed, &dac, self.m.cpu.steps, self.m.ips)
                 };
-                (overlay::W, overlay::H, overlay::compose(&rgb, &self.screen.items(), &patches, &dac, g))
+                let mut out = overlay::compose(&rgb, &self.screen.items(), &patches, &dac, g);
+                if !self.take.passthrough && !self.credits.lines.is_empty() {
+                    // 名單字色：英文名單完全淡入時金字主體的 RGB（docs/spec/006 §2）。
+                    overlay::draw_credits(g, &mut out, &self.credits.lines, crate::credits::RGB);
+                }
+                (overlay::W, overlay::H, out)
             }
             _ => (w, h, rgb),
         }
