@@ -14,6 +14,7 @@
 //! `--trace-driver N` 另輸出 driver.tsv：第 N 步起每次進入驅動跳躍表的入口、呼叫者與暫存器。
 //! `--watch lo-hi` 把寫入監看改到另一個線性範圍（十六進位，例：離屏緩衝 28d10-3854f）；
 //! 覆繪生命週期依 A0000 判斷，改了之後該次執行的覆繪不可信，只用於取證。
+//! `--chapter N` 取證用：第一次進入開章程式 `1bb9` 時以第 N 章開始（只改 AL，docs/re/006）。
 use ferrogolem_core::machine::DEFAULT_IPS;
 use ferrogolem_core::png::encode_rgb;
 use kgb_cht::session::{Session, load_text};
@@ -39,6 +40,7 @@ struct Args {
     trace_at: Vec<u16>,
     labels: Option<PathBuf>,
     simplified: bool,
+    chapter: Option<u8>,
 }
 
 enum Action {
@@ -77,7 +79,7 @@ fn parse() -> Result<Args, String> {
     let (mut tsv, mut font, mut font_index) = (Vec::new(), None, 3);
     let (mut input, mut trace_phrases, mut trace_writers, mut watch, mut trace_driver) = (None, false, None, None, None);
     let mut trace_at = Vec::new();
-    let (mut labels, mut simplified) = (None, false);
+    let (mut labels, mut simplified, mut chapter) = (None, false, None);
     while let Some(k) = it.next() {
         let mut v = || it.next().ok_or(format!("{k} 需要值"));
         match k.as_str() {
@@ -100,6 +102,13 @@ fn parse() -> Result<Args, String> {
             }
             "--labels" => labels = Some(PathBuf::from(v()?)),
             "--simplified" => simplified = true,
+            "--chapter" => {
+                let n: u8 = v()?.parse().map_err(|e| format!("--chapter：{e}"))?;
+                if !(1..=4).contains(&n) {
+                    return Err(format!("--chapter 只接受 1–4，收到 {n}"));
+                }
+                chapter = Some(n);
+            }
             "--trace-at" => {
                 for x in v()?.split(',') {
                     trace_at.push(u16::from_str_radix(x, 16).map_err(|e| format!("--trace-at：{e}"))?);
@@ -128,6 +137,7 @@ fn parse() -> Result<Args, String> {
         trace_at,
         labels,
         simplified,
+        chapter,
     })
 }
 
@@ -147,6 +157,7 @@ fn run(a: Args) -> Result<bool, String> {
             s.sprites.set_cards(kgb_cht::sprites::parse_cards(&cards)?);
         }
     }
+    s.start_chapter = a.chapter;
     if !a.trace_at.is_empty() {
         s.trace_at = Some((a.trace_at.clone(), String::from("step\tat\tret\tregs\n")));
     }

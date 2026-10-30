@@ -2,7 +2,7 @@
 
 把 Cryo《KGB》CD 版（Conspiracy）在執行期中文化，分繁中（台灣用語）與簡中（大陸用語）兩個版本。遊戲跑在自有的 Rust DOS 模擬器 [FerroGolem](../ferrogolem)（另一個 repo）上，本庫接手遊戲的文字 routine，跳過英文繪字，把中文畫在放大 3 倍的覆繪層。
 
-目前開場字幕、第一到四章片語與說明影片字幕已有中文，可開視窗遊玩並在工具列切換繁中、简中、英文原版；第一章已實機驗證主要介面，第二章起尚未實機走過，聲音尚未輸出。現況見 [CONTEXT.md](CONTEXT.md)，未完成項見 [docs/worklist.json](docs/worklist.json)。
+目前開場字幕、第一到四章片語與說明影片字幕已有中文，可開視窗遊玩並在工具列切換繁中、简中、英文原版；第一到四章都已在遊戲裡抽樣看到中文，聲音尚未輸出。現況見 [CONTEXT.md](CONTEXT.md)，未完成項見 [docs/worklist.json](docs/worklist.json)。
 
 使用者必須自備合法原版。本庫不含遊戲檔、影片、音訊、字型或截圖。
 

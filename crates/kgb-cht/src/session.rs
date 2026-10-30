@@ -37,6 +37,9 @@ pub struct Session {
     pub trace_at: Option<(Vec<u16>, String)>,
     /// 取證用：從某步數起記錄進入驅動程式跳躍表（驅動段 0100h–01FFh）的呼叫與暫存器。
     pub driver_log: Option<(u64, String)>,
+    /// 取證用：第一次進入開章程式 `1bb9` 時把 AL 改成這一章，
+    /// 只改暫存器，讓遊戲自己的開章程式載入該章（docs/re/006）。用一次即清除。
+    pub start_chapter: Option<u8>,
     /// 進行中的 `53d8`、`56d5` 呼叫。
     frames: Vec<Frame>,
     /// 各區塊（ES, DI）已完成的片語與插槽範圍（docs/spec/004 §7、§8）。
@@ -47,6 +50,9 @@ pub struct Session {
 const PHRASE_DECODE: u16 = 0x53d8;
 /// 插槽填入（docs/spec/004 §8）：AL＝字碼，ES:DI＝文字區塊。
 const SLOT_FILL: u16 = 0x56d5;
+/// 開章程式入口：AL＝章號（1–4），AH＝FFh；程式內把 AL 寫入 `[030e]`（`1bdf`）。
+/// 新遊戲由 `18d6` 取 `[030e]` 後在 `18db` 呼叫（docs/re/006）。
+const START_CHAPTER: u16 = 0x1bb9;
 
 /// 一次進行中的呼叫：以返回位址與進入時的 SP 判斷何時返回。
 struct Frame {
@@ -79,6 +85,7 @@ impl Session {
             writers: None,
             driver_log: None,
             trace_at: None,
+            start_chapter: None,
             frames: Vec::new(),
             segments: HashMap::new(),
         })
@@ -89,6 +96,11 @@ impl Session {
         while self.m.cpu.steps < until && !self.m.exited {
             if self.m.cpu.s[CS] == self.m.psp.wrapping_add(0x10) {
                 self.track_segments();
+                if self.m.cpu.ip == START_CHAPTER {
+                    if let Some(n) = self.start_chapter.take() {
+                        self.m.cpu.set8(0, n);
+                    }
+                }
                 if !self.take.passthrough {
                     self.sprites.observe(&self.m);
                 }

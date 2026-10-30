@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-RRSAL-1.0
-//! 以遊戲自己的圖塊程式把 SPRA.ANC 的每個圖塊畫成 PNG（取證用，docs/re/006）。
+//! 以遊戲自己的圖塊程式把 SPRA.ANC 的每個圖塊畫成 PNG（取證用，docs/spec/005）。
 //!
 //! 跑到章節已載入後，對圖塊庫 `[2144:06d2]` 的每個編號呼叫 `188b:85d5`（AX＝編號、CX＝x、BX＝y），
 //! 圖塊畫進驅動的離屏緩衝（段＝驅動 `[020c]`），讀出非 0 像素的外框，以當時的 DAC 轉成 PNG。
