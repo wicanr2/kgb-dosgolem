@@ -19,6 +19,7 @@ FONT_LICENSE=/usr/share/doc/fonts-noto-cjk/copyright
 # AppImage type2 runtime：第一次 image 時下載到 workplace/cache，之後只核對雜湊。
 RUNTIME_URL="https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64"
 RUNTIME="$WP/cache/appimage-runtime-x86_64"
+RUNTIME_SHA256=617aa77314d57c8b8e4fae9c3f0b35af7b30d5529cb69e98f64f92510ed98a46  # 2026-10-30 下載的 continuous
 MACOS_MIN=11.0
 NAME=kgb-cht
 
@@ -101,6 +102,7 @@ linux() {
   chmod +x "$app/AppRun"
   printf '[Desktop Entry]\nType=Application\nName=KGB 中文版\nExec=%s\nIcon=%s\nCategories=Game;\n' "$NAME" "$NAME" > "$app/$NAME.desktop"
   need "$RUNTIME"
+  test "$(sha256sum "$RUNTIME" | cut -c1-64)" = "$RUNTIME_SHA256" || die "AppImage runtime 雜湊不符"
   # mksquashfs 要寫輸出目錄，另以可寫掛載執行（run_pkg 的專案掛載是唯讀）。
   timeout 1800 docker run --rm -u "$(id -u):$(id -g)" --name "dgrs-pkg-sq-$$" --network none --memory 4g --cpus 4 --pids-limit 256 \
     --log-opt max-size=10m --log-opt max-file=3 -v "$OUT/linux:/out" "$PKG_IMAGE" \
@@ -177,14 +179,16 @@ case "${1:-}" in
     mkdir -p "$WP/cache"
     test -f "$RUNTIME" || timeout 300 docker run --rm -u "$(id -u):$(id -g)" --name "dgrs-pkg-dl-$$" --network bridge \
       --memory 512m --cpus 1 --pids-limit 64 --log-opt max-size=10m --log-opt max-file=3 -v "$WP/cache:/out" "$PKG_IMAGE" \
-      curl -fsSL -o /out/appimage-runtime-x86_64 "$RUNTIME_URL"
+      python3 -I -c 'import sys, urllib.request; urllib.request.urlretrieve(sys.argv[1], "/out/appimage-runtime-x86_64")' "$RUNTIME_URL"
     echo "AppImage runtime SHA-256：$(sha256sum "$RUNTIME" | cut -c1-64)"
     ;;
   with-data)
     preflight
+    # 掛載前先建好，否則 dockerd 會以 root 建目錄（AGENTS.md §9）。
+    mkdir -p "$WP/target-pkg" "$WP/cargo"
     check_text
     OUT="$WP/dist/$VERSION"
-    rm -rf "$OUT"; mkdir -p "$OUT" "$WP/target-pkg"
+    rm -rf "$OUT"; mkdir -p "$OUT"
     case "${2:-all}" in
       linux) linux ;; windows) windows ;; macos) macos ;;
       all) linux; windows; macos ;;
