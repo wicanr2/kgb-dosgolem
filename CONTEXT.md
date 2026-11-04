@@ -4,6 +4,7 @@
 
 ## 現況
 
+- 本機磁碟清理（2026-11-04）：使用者裁定只留必要檔案。`workplace/runs` 與 `workplace/profbench` 的截圖、錄音與舊執行檔，建置輸出，以及 `workplace/dist` 的舊封包已刪，專案由 27 GB 降到 1.9 GB。`dist-all/` 的 v1.2.2、`workplace/disc`（FerroGolem 探針也在用）、`workplace/cargo`（離線建置依賴）與文字收據保留。文件直接連到的檔案保留，其餘歷史畫面要重跑才有。逐檔清單在 `workplace/cleanup-20261104/`，過程見 `WORKLOG.md`。
 - 原版光碟已解到 `workplace/disc/`（docs/re/001）。
 - 模擬器在 FerroGolem（`~/cht/ferrogolem`）。KGB 在 50M 步內跑到 `INTRO.BGF` 開場，沒有停點（docs/re/002）。
 - 文字 routine 已接手（docs/spec/004）：開場兩段共 47 句字幕已有譯文（`text/intro.zh-TW.tsv`，譯名見 `text/glossary.tsv`），第一段 31 句在 334M 步內全部以中文顯示，換場時依原版時機消失。
